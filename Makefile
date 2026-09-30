@@ -42,6 +42,11 @@ run-frontend: ## Start the Dash dashboard in development mode
 	$(UV) run python -m athlete_stress_sim.frontend.app
 
 docker-up: ## Build and start all services with Docker Compose
+	@printf "\n\033[1mServices will be available at:\033[0m\n"
+	@printf "  Frontend (Dash) : \033[36mhttp://localhost:8050\033[0m\n"
+	@printf "  Backend  (API)  : \033[36mhttp://localhost:8000\033[0m\n"
+	@printf "  API docs (docs) : \033[36mhttp://localhost:8000/docs\033[0m\n"
+	@printf "\nPress Ctrl+C to stop.\n\n"
 	$(COMPOSE) up --build
 
 docker-down: ## Stop and remove the Docker Compose services
