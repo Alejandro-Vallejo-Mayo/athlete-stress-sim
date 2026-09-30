@@ -33,7 +33,7 @@ En el entrenamiento de resistencia e híbrido (carrera a pie + gimnasio), la may
 | Componente | Tecnología Seleccionada | Justificación Técnica |
 |------------|-------------------------|----------------------|
 | **Lenguaje Core** | Python 3.11+ | Ecosistema científico unificado (`scipy`, `statsmodels`, `filterpy`). |
-| **Ingesta de Datos** | `httpx` + OAuth2 | Integración con la API REST Polar AccessLink y Webhooks. |
+| **Ingesta de Datos** | `httpx2` + OAuth2 | Integración con la API REST Polar AccessLink y Webhooks. |
 | **Parsing de Archivos** | `fitparse` | Extracción de telemetría punto a punto de archivos `.FIT` / `.TCX`. |
 | **Persistencia Analítica** | **DuckDB** | Almacenamiento analítico embebido OLAP para series temporales. |
 | **Motor Fisiológico** | `SciPy` (EDO) + `FilterPy` (EKF) | Resolución numérica de sistemas continuos e inferencia bayesiana. |

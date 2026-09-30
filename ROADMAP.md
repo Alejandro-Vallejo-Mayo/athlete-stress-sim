@@ -115,7 +115,7 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 
 - [ ] Instalar `uv` y fijar Python 3.11+ con `.python-version`.
 - [ ] Inicializar proyecto con `uv init` y layout `src/athlete_stress_sim/` (paquete único).
-- [ ] Configurar `pyproject.toml`: dependencias (`scipy`, `statsmodels`, `filterpy`, `httpx`, `fitparse`, `duckdb`, `fastapi`, `uvicorn`, `dash`, `dash-mantine-components`, `pydantic`), `[project.scripts]`, `[tool.uv]`, `[tool.ruff]`, `[tool.mypy]`, `[tool.pytest.ini_options]`; generar `uv.lock`.
+- [ ] Configurar `pyproject.toml`: dependencias (`scipy`, `statsmodels`, `filterpy`, `httpx2`, `fitparse`, `duckdb`, `fastapi`, `uvicorn`, `dash`, `dash-mantine-components`, `pydantic`), `[project.scripts]`, `[tool.uv]`, `[tool.ruff]`, `[tool.mypy]`, `[tool.pytest.ini_options]`; generar `uv.lock`.
 - [ ] Crear `src/athlete_stress_sim/backend/config.py` con constantes fisiológicas y placeholders de credenciales (`HR_max`, `HR_reposo`, `tau_1`, `tau_2`, `k_1`, `k_2`, `b`).
 - [ ] Crear `.env.example` (client_id, client_secret, access_token, etc.).
 - [ ] Crear `Makefile` con targets: `install`, `lint`, `format`, `typecheck`, `test`, `run-backend`, `run-frontend`, `docker-up`, `docker-down`.
@@ -127,7 +127,7 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 #### Semana 2 — Autenticación OAuth2 Polar
 **Objetivo:** vincular la cuenta Polar (`RF-01.1`).
 
-- [ ] Implementar flujo Authorization Code + PKCE con `httpx`.
+- [ ] Implementar flujo Authorization Code + PKCE con `httpx2`.
 - [ ] Endpoints `/auth/login` y `/auth/callback` en FastAPI.
 - [ ] Registrar usuario Polar y persistir tokens (access + refresh) en DuckDB o config cifrada.
 - [ ] Gestión de refresco de token automático (expiración).
