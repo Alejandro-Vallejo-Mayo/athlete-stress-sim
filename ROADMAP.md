@@ -113,21 +113,21 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 #### Semana 1 — Entorno, repo y scaffolding
 **Objetivo:** dejar el proyecto reproducible desde el minuto cero, con tooling completo.
 
-- [ ] Instalar `uv` y fijar Python 3.11+ con `.python-version`.
-- [ ] Inicializar proyecto con `uv init` y layout `src/athlete_stress_sim/` (paquete único).
-- [ ] Configurar `pyproject.toml`: dependencias (`scipy`, `statsmodels`, `filterpy`, `httpx`, `fitparse`, `duckdb`, `fastapi`, `uvicorn`, `dash`, `dash-mantine-components`, `pydantic`), `[project.scripts]`, `[tool.uv]`, `[tool.ruff]`, `[tool.mypy]`, `[tool.pytest.ini_options]`; generar `uv.lock`.
-- [ ] Crear `src/athlete_stress_sim/backend/config.py` con constantes fisiológicas y placeholders de credenciales (`HR_max`, `HR_reposo`, `tau_1`, `tau_2`, `k_1`, `k_2`, `b`).
-- [ ] Crear `.env.example` (client_id, client_secret, access_token, etc.).
-- [ ] Crear `Makefile` con targets: `install`, `lint`, `format`, `typecheck`, `test`, `run-backend`, `run-frontend`, `docker-up`, `docker-down`.
-- [ ] Configurar `.pre-commit-config.yaml` (ruff, ruff-format, mypy, end-of-file-fixer, trailing-whitespace, check-yaml, check-toml, detect-private-key).
-- [ ] Configurar `.github/workflows/ci.yml` que invoque `make lint` y `make test` (no comandos sueltos).
-- [ ] Configurar `docker/Dockerfile.*` y `docker-compose.yml` instalando dependencias vía `uv sync`.
-- [ ] Hito: `make install && make lint && make test` y `docker compose up` funcionan sin errores.
+- [x] Instalar `uv` y fijar Python 3.12 con `.python-version`.
+- [x] Inicializar proyecto con `uv init` y layout `src/athlete_stress_sim/` (paquete único).
+- [x] Configurar `pyproject.toml`: dependencias (`scipy`, `statsmodels`, `filterpy`, `httpx2`, `fitparse`, `duckdb`, `fastapi`, `uvicorn`, `dash`, `dash-mantine-components`, `pydantic`), `[project.scripts]`, `[tool.uv]`, `[tool.ruff]`, `[tool.mypy]`, `[tool.pytest.ini_options]`; generar `uv.lock`.
+- [x] Crear `src/athlete_stress_sim/backend/config.py` con constantes fisiológicas y placeholders de credenciales (`HR_max`, `HR_reposo`, `tau_1`, `tau_2`, `k_1`, `k_2`, `b`).
+- [x] Crear `.env.example` (client_id, client_secret, access_token, etc.).
+- [x] Crear `Makefile` con targets: `install`, `lint`, `format`, `typecheck`, `test`, `run-backend`, `run-frontend`, `docker-up`, `docker-down`.
+- [x] Configurar `.pre-commit-config.yaml` (ruff, ruff-format, mypy, end-of-file-fixer, trailing-whitespace, check-yaml, check-toml, detect-private-key).
+- [x] Configurar `.github/workflows/ci.yml` que invoque `make lint`, `make typecheck` y `make test` (no comandos sueltos).
+- [x] Configurar `docker/Dockerfile.*` y `docker-compose.yml` instalando dependencias vía `uv sync`.
+- [x] Hito: `make install && make lint && make test` y `docker compose up` funcionan sin errores.
 
 #### Semana 2 — Autenticación OAuth2 Polar
 **Objetivo:** vincular la cuenta Polar (`RF-01.1`).
 
-- [ ] Implementar flujo Authorization Code + PKCE con `httpx`.
+- [ ] Implementar flujo Authorization Code + PKCE con `httpx2`.
 - [ ] Endpoints `/auth/login` y `/auth/callback` en FastAPI.
 - [ ] Registrar usuario Polar y persistir tokens (access + refresh) en DuckDB o config cifrada.
 - [ ] Gestión de refresco de token automático (expiración).
