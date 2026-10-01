@@ -14,7 +14,7 @@ help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
-install: ## Create the environment, install deps and activate git hooks
+install: ## Create the environment, install dependencies and activate git hooks
 	$(UV) sync --all-groups
 	$(UV) run pre-commit install
 
