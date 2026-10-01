@@ -1,4 +1,4 @@
-"""Central configuration: physiological constants and Polar credentials.
+"""Central configuration: physiological constants, Polar OAuth2 and storage.
 
 Credentials are read from environment variables / a ``.env`` file (see
 ``.env.example``). Physiological values belong to the *user zero* and act as
@@ -6,6 +6,8 @@ Credentials are read from environment variables / a ``.env`` file (see
 """
 
 from __future__ import annotations
+
+from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -35,7 +37,7 @@ class PhysiologicalConfig(BaseSettings):
 
 
 class PolarConfig(BaseSettings):
-    """Polar AccessLink OAuth2 credentials (placeholders until S2)."""
+    """Polar AccessLink OAuth2 settings and endpoint URLs."""
 
     model_config = SettingsConfigDict(
         env_prefix="POLAR_",
@@ -50,9 +52,41 @@ class PolarConfig(BaseSettings):
         default="http://localhost:8000/auth/callback",
         description="Redirect URI registered in Polar.",
     )
-    access_token: str = Field(default="", description="Current OAuth2 access token.")
-    refresh_token: str = Field(default="", description="OAuth2 refresh token.")
+    authorize_url: str = Field(
+        default="https://flow.polar.com/oauth2/authorization",
+        description="Polar OAuth2 authorization endpoint.",
+    )
+    token_url: str = Field(
+        default="https://polarremote.com/v2/oauth2/token",
+        description="Polar OAuth2 token endpoint.",
+    )
+    api_url: str = Field(
+        default="https://www.polaraccesslink.com/v3",
+        description="Polar AccessLink REST API base URL.",
+    )
+    scope: str = Field(default="accesslink.read_all", description="Requested OAuth2 scope.")
+    member_id: str = Field(
+        default="athlete-stress-sim",
+        description="Partner member id used to register the Polar user.",
+    )
+
+
+class StorageConfig(BaseSettings):
+    """Local persistence settings."""
+
+    model_config = SettingsConfigDict(
+        env_prefix="ATHLETE_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    db_path: Path = Field(
+        default=Path("data/athleta.duckdb"),
+        description="Path to the local DuckDB analytical database.",
+    )
 
 
 physiology = PhysiologicalConfig()
 polar = PolarConfig()
+storage = StorageConfig()

@@ -127,12 +127,12 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 #### Semana 2 — Autenticación OAuth2 Polar
 **Objetivo:** vincular la cuenta Polar (`RF-01.1`).
 
-- [ ] Implementar flujo Authorization Code + PKCE con `httpx2`.
-- [ ] Endpoints `/auth/login` y `/auth/callback` en FastAPI.
-- [ ] Registrar usuario Polar y persistir tokens (access + refresh) en DuckDB o config cifrada.
-- [ ] Gestión de refresco de token automático (expiración).
-- [ ] Tests unitarios del flujo con servidor OAuth mockeado.
-- [ ] Hito: se obtiene y renueva un `access_token` válido de forma programática.
+- [x] Implementar flujo Authorization Code + `state` con `httpx2` (cliente confidencial, sin PKCE).
+- [x] Endpoints `/auth/login` y `/auth/callback` en FastAPI.
+- [x] Registrar usuario Polar y persistir tokens (access + refresh) en DuckDB o config cifrada.
+- [x] Gestión de refresco de token automático (expiración).
+- [x] Tests unitarios del flujo con servidor OAuth mockeado.
+- [x] Hito: se obtiene y renueva un `access_token` válido de forma programática.
 
 #### Semana 3 — Cliente AccessLink y webhooks
 **Objetivo:** descargar sesiones automáticamente (`RF-01.2`).
@@ -261,9 +261,9 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 ## 7. Criterios de aceptación por fase
 
 ### Fase 0 — DoD
-- [ ] Se puede autenticar contra Polar AccessLink y persistir tokens.
+- [x] Se puede autenticar contra Polar AccessLink y persistir tokens.
 - [ ] Una sesión de carrera queda persistida en DuckDB con series segundo a segundo.
-- [ ] Entorno Docker reproducible con `docker compose up`.
+- [x] Entorno Docker reproducible con `docker compose up`.
 - [ ] Tests de `src/athlete_stress_sim/core/etl` en verde.
 
 ### Fase 1 — DoD
