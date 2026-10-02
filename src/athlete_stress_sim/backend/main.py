@@ -1,7 +1,6 @@
 """FastAPI backend entry point.
 
-In S1 this is only a *scaffold*: the app starts with a health endpoint. Metrics,
-OAuth2 and webhook endpoints arrive in S2-S3 and S10.
+S1 scaffold plus the S2 Polar OAuth2 router. Metrics endpoints arrive in S10.
 """
 
 from __future__ import annotations
@@ -9,6 +8,7 @@ from __future__ import annotations
 import uvicorn
 from fastapi import FastAPI
 
+from athlete_stress_sim.backend.api.oauth import router as oauth_router
 from athlete_stress_sim.backend.config import physiology, polar
 
 app = FastAPI(
@@ -16,6 +16,8 @@ app = FastAPI(
     version="0.1.0",
     description="Biomechanical Fatigue & Load Management Optimizer",
 )
+
+app.include_router(oauth_router)
 
 
 @app.get("/health", tags=["system"])
