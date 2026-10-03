@@ -1,0 +1,207 @@
+"""DuckDB persistence for parsed Polar sessions.
+
+Creates the OLAP model (``athlete``, ``exercises``, ``samples``) and stores
+second-by-second telemetry (``RNF-01``, local-only).
+"""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from pathlib import Path
+
+import duckdb
+
+from athlete_stress_sim.core.etl.types import ParsedSession, Sample
+
+_ATHLETE_SCHEMA = """
+CREATE TABLE IF NOT EXISTS athlete (
+    athlete_id INTEGER PRIMARY KEY,
+    polar_user_id VARCHAR,
+    created_at TIMESTAMP
+)
+"""
+
+_EXERCISES_SCHEMA = """
+CREATE TABLE IF NOT EXISTS exercises (
+    exercise_id VARCHAR PRIMARY KEY,
+    sport VARCHAR,
+    sub_sport VARCHAR,
+    start_time TIMESTAMP,
+    duration_s DOUBLE,
+    distance_m DOUBLE,
+    calories DOUBLE,
+    avg_hr INTEGER,
+    max_hr INTEGER,
+    total_ascent_m DOUBLE,
+    total_descent_m DOUBLE,
+    file_path VARCHAR,
+    parsed_at TIMESTAMP
+)
+"""
+
+_SAMPLES_SCHEMA = """
+CREATE TABLE IF NOT EXISTS samples (
+    exercise_id VARCHAR NOT NULL,
+    ts TIMESTAMP NOT NULL,
+    elapsed_s DOUBLE NOT NULL,
+    hr INTEGER,
+    speed_mps DOUBLE,
+    cadence INTEGER,
+    altitude_m DOUBLE,
+    distance_m DOUBLE,
+    is_valid BOOLEAN NOT NULL
+)
+"""
+
+_DEFAULT_ATHLETE_ID = 1
+
+
+class SessionStore:
+    """Persist parsed sessions and their telemetry samples.
+
+    Args:
+        db_path: Path to the DuckDB file. Parent directories are created if needed.
+    """
+
+    def __init__(self, db_path: Path | str) -> None:
+        self._db_path = Path(db_path)
+        self._db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._ensure_schema()
+
+    def _connect(self) -> duckdb.DuckDBPyConnection:
+        return duckdb.connect(str(self._db_path))
+
+    def _ensure_schema(self) -> None:
+        connection = self._connect()
+        try:
+            for statement in (_ATHLETE_SCHEMA, _EXERCISES_SCHEMA, _SAMPLES_SCHEMA):
+                connection.execute(statement)
+        finally:
+            connection.close()
+
+    def ensure_athlete(self, polar_user_id: str) -> None:
+        """Create the single user-zero athlete row if it does not exist yet."""
+        connection = self._connect()
+        try:
+            connection.execute(
+                "INSERT OR IGNORE INTO athlete VALUES (?, ?, ?)",
+                [_DEFAULT_ATHLETE_ID, polar_user_id, datetime.now(UTC).replace(tzinfo=None)],
+            )
+        finally:
+            connection.close()
+
+    def get_athlete(self) -> str | None:
+        """Return the stored Polar user id, or ``None`` if no athlete row exists."""
+        connection = self._connect()
+        try:
+            row = connection.execute(
+                "SELECT polar_user_id FROM athlete WHERE athlete_id = ?",
+                [_DEFAULT_ATHLETE_ID],
+            ).fetchone()
+        finally:
+            connection.close()
+        return str(row[0]) if row is not None else None
+
+    def has_session(self, exercise_id: str) -> bool:
+        """Whether an exercise has already been parsed and persisted."""
+        connection = self._connect()
+        try:
+            row = connection.execute(
+                "SELECT 1 FROM exercises WHERE exercise_id = ?",
+                [exercise_id],
+            ).fetchone()
+        finally:
+            connection.close()
+        return row is not None
+
+    def save_session(self, exercise_id: str, session: ParsedSession, file_path: str) -> None:
+        """Persist a parsed session, replacing any previous copy of it."""
+        metadata = session.metadata
+        connection = self._connect()
+        try:
+            connection.execute("DELETE FROM samples WHERE exercise_id = ?", [exercise_id])
+            connection.execute("DELETE FROM exercises WHERE exercise_id = ?", [exercise_id])
+            connection.execute(
+                "INSERT INTO exercises VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [
+                    exercise_id,
+                    metadata.sport,
+                    metadata.sub_sport,
+                    metadata.start_time,
+                    metadata.duration_s,
+                    metadata.distance_m,
+                    metadata.calories,
+                    metadata.avg_hr,
+                    metadata.max_hr,
+                    metadata.total_ascent_m,
+                    metadata.total_descent_m,
+                    file_path,
+                    datetime.now(UTC).replace(tzinfo=None),
+                ],
+            )
+            if session.samples:
+                connection.executemany(
+                    "INSERT INTO samples VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    [
+                        [
+                            exercise_id,
+                            sample.timestamp,
+                            sample.elapsed_s,
+                            sample.hr,
+                            sample.speed_mps,
+                            sample.cadence,
+                            sample.altitude_m,
+                            sample.distance_m,
+                            sample.is_valid,
+                        ]
+                        for sample in session.samples
+                    ],
+                )
+        finally:
+            connection.close()
+
+    def count_sessions(self) -> int:
+        """Number of exercises persisted."""
+        connection = self._connect()
+        try:
+            row = connection.execute("SELECT COUNT(*) FROM exercises").fetchone()
+        finally:
+            connection.close()
+        return int(row[0]) if row is not None else 0
+
+    def count_samples(self, exercise_id: str) -> int:
+        """Number of samples stored for an exercise."""
+        connection = self._connect()
+        try:
+            row = connection.execute(
+                "SELECT COUNT(*) FROM samples WHERE exercise_id = ?",
+                [exercise_id],
+            ).fetchone()
+        finally:
+            connection.close()
+        return int(row[0]) if row is not None else 0
+
+    def query_samples(self, exercise_id: str) -> list[Sample]:
+        """Return the stored samples for an exercise, ordered by elapsed time."""
+        connection = self._connect()
+        try:
+            rows = connection.execute(
+                "SELECT ts, elapsed_s, hr, speed_mps, cadence, altitude_m, distance_m, is_valid "
+                "FROM samples WHERE exercise_id = ? ORDER BY elapsed_s",
+                [exercise_id],
+            ).fetchall()
+        finally:
+            connection.close()
+        return [
+            Sample(
+                timestamp=row[0],
+                elapsed_s=row[1],
+                hr=row[2],
+                speed_mps=row[3],
+                cadence=row[4],
+                altitude_m=row[5],
+                distance_m=row[6],
+                is_valid=row[7],
+            )
+            for row in rows
+        ]

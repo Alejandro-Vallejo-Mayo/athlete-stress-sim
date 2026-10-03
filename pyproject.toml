@@ -92,6 +92,9 @@ minversion = "8.0"
 addopts = "-ra --strict-markers --strict-config"
 testpaths = ["tests"]
 pythonpath = ["src"]
+filterwarnings = [
+    "ignore::DeprecationWarning:fitparse",
+]
 
 [tool.coverage.run]
 source = ["src/athlete_stress_sim/core"]
