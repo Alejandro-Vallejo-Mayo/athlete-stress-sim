@@ -134,14 +134,14 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 - [x] Tests unitarios del flujo con servidor OAuth mockeado.
 - [x] Hito: se obtiene y renueva un `access_token` válido de forma programática.
 
-#### Semana 3 — Cliente AccessLink y webhooks
+#### Semana 3 — Cliente AccessLink y sincronización catch-up
 **Objetivo:** descargar sesiones automáticamente (`RF-01.2`).
 
-- [ ] Cliente `src/athlete_stress_sim/core/etl/polar_client.py`: listar `exercises`, obtener resúmenes y transacciones.
-- [ ] Implementar listener de webhooks + fallback con cron/polling.
-- [ ] Endpoint `POST /webhooks/polar` para notificaciones de nueva sesión.
-- [ ] Manejo de errores, reintentos y `429` (rate limiting).
-- [ ] Hito: una sesión nueva dispara la descarga automática.
+- [x] Cliente `src/athlete_stress_sim/core/etl/polar_client.py`: listar `exercises`, obtener resúmenes y descargar `.FIT`/`.TCX`.
+- [x] Sincronización *catch-up* idempotente (arranque + `POST /sync`); webhooks/cron diferidos (uso local, sin HTTPS pública).
+- [x] Registro de ingesta en DuckDB (`ingest_log`) como cola para S4.
+- [x] Manejo de errores, reintentos con backoff y `429` (rate limiting).
+- [x] Hito: al sincronizar, una sesión nueva se descarga automáticamente y queda registrada.
 
 #### Semana 4 — Parser FIT/TCX y persistencia DuckDB
 **Objetivo:** series temporales segundo a segundo en DuckDB (`RF-01.3`, `RNF-01`).
@@ -264,7 +264,7 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 - [x] Se puede autenticar contra Polar AccessLink y persistir tokens.
 - [ ] Una sesión de carrera queda persistida en DuckDB con series segundo a segundo.
 - [x] Entorno Docker reproducible con `docker compose up`.
-- [ ] Tests de `src/athlete_stress_sim/core/etl` en verde.
+- [x] Tests de `src/athlete_stress_sim/core/etl` en verde.
 
 ### Fase 1 — DoD
 - [ ] TRIMP (carrera y gym), ACWR, EDO Banister y EKF implementados y testeados.
@@ -287,7 +287,8 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 
 | Riesgo | Impacto | Probabilidad | Mitigación |
 |--------|---------|--------------|------------|
-| Dependencia de disponibilidad/rate-limit de la API Polar | Alto | Media | Fallback con polling + reintentos; cacheo local (S3). |
+| Dependencia de disponibilidad/rate-limit de la API Polar | Alto | Media | Sincronización *catch-up* idempotente (arranque + botón) con reintentos/backoff y `Retry-After`; cacheo local (S3). |
+| `AccessLink` v4 (Dynamic API, JSON) podría simplificar la ingesta | Medio | Baja | Evaluada en S3; se mantiene v3 (FIT/TCX) y la migración se difiere a F3 si aporta valor. |
 | Datos insuficientes para calibrar el EKF (pocas semanas) | Alto | Media | Usar priors bibliográficos; arrancar con valores de referencia (S1). |
 | Complejidad matemática (EDO + EKF) consume más tiempo del previsto | Alto | Media | Separar métricas (F1) de modelos (F1 tardía); priorizar TRIMP/ACWR como MVP. |
 | Curva de aprendizaje de Plotly Dash + Mantine | Medio | Media | Esqueleto temprano (S11); componentes reutilizables. |

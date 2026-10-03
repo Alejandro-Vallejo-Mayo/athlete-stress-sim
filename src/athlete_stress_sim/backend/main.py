@@ -1,23 +1,59 @@
 """FastAPI backend entry point.
 
-S1 scaffold plus the S2 Polar OAuth2 router. Metrics endpoints arrive in S10.
+S1 scaffold, the S2 Polar OAuth2 router and the S3 catch-up ingestion sync.
+Metrics endpoints arrive in S10.
 """
 
 from __future__ import annotations
 
+import asyncio
+import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 import uvicorn
 from fastapi import FastAPI
 
+from athlete_stress_sim.backend.api.ingest import get_sync_service
+from athlete_stress_sim.backend.api.ingest import router as ingest_router
 from athlete_stress_sim.backend.api.oauth import router as oauth_router
 from athlete_stress_sim.backend.config import physiology, polar
+from athlete_stress_sim.core.etl.polar_client import PolarAuthError
+
+logger = logging.getLogger(__name__)
+
+
+def _startup_sync() -> None:
+    """Run one catch-up sync, logging instead of raising on failure."""
+    try:
+        result = get_sync_service().sync()
+        logger.info("Startup sync finished: %s", result.model_dump())
+    except PolarAuthError:
+        logger.info("Startup sync skipped: no Polar account linked yet.")
+    except Exception:  # noqa: BLE001
+        logger.exception("Startup sync failed")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Kick off a catch-up sync in the background when the app starts."""
+    task: asyncio.Task[None] | None = None
+    if polar.sync_on_startup:
+        task = asyncio.create_task(asyncio.to_thread(_startup_sync))
+    yield
+    if task is not None and not task.done():
+        task.cancel()
+
 
 app = FastAPI(
     title="Athlete Stress Sim",
     version="0.1.0",
     description="Biomechanical Fatigue & Load Management Optimizer",
+    lifespan=lifespan,
 )
 
 app.include_router(oauth_router)
+app.include_router(ingest_router)
 
 
 @app.get("/health", tags=["system"])

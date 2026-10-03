@@ -8,7 +8,7 @@ COMPOSE ?= docker compose -f docker/docker-compose.yml
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install lint format typecheck test test-cov run-backend run-frontend docker-up docker-down clean
+.PHONY: help install lint format typecheck test test-cov run-backend run-frontend docker-up docker-logs docker-down clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -41,13 +41,18 @@ run-backend: ## Start the FastAPI backend in development mode
 run-frontend: ## Start the Dash dashboard in development mode
 	$(UV) run python -m athlete_stress_sim.frontend.app
 
-docker-up: ## Build and start all services with Docker Compose
-	@printf "\n\033[1mServices will be available at:\033[0m\n"
+docker-up: ## Build and start all services (background)
+	@printf "\n\033[1mBuilding and starting services in the background...\033[0m\n"
+	@printf "(the first build can take ~1 minute; the progress bar may look frozen)\n\n"
+	$(COMPOSE) up --build -d
+	@printf "\n\033[1mServices available at:\033[0m\n"
 	@printf "  Frontend (Dash) : \033[36mhttp://localhost:8050\033[0m\n"
 	@printf "  Backend  (API)  : \033[36mhttp://localhost:8000\033[0m\n"
 	@printf "  API docs (docs) : \033[36mhttp://localhost:8000/docs\033[0m\n"
-	@printf "\nPress Ctrl+C to stop.\n\n"
-	$(COMPOSE) up --build
+	@printf "\nFollow logs with 'make docker-logs' and stop with 'make docker-down'.\n"
+
+docker-logs: ## Follow the logs of all Docker Compose services
+	$(COMPOSE) logs -f
 
 docker-down: ## Stop and remove the Docker Compose services
 	$(COMPOSE) down

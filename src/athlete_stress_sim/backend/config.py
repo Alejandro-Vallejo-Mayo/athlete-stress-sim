@@ -69,6 +69,10 @@ class PolarConfig(BaseSettings):
         default="athlete-stress-sim",
         description="Partner member id used to register the Polar user.",
     )
+    sync_on_startup: bool = Field(
+        default=True,
+        description="Run a catch-up sync in the background when the backend starts.",
+    )
 
 
 class StorageConfig(BaseSettings):
@@ -84,6 +88,10 @@ class StorageConfig(BaseSettings):
     db_path: Path = Field(
         default=Path("data/athleta.duckdb"),
         description="Path to the local DuckDB analytical database.",
+    )
+    raw_data_dir: Path = Field(
+        default=Path("data/raw"),
+        description="Directory where raw Polar files (FIT/TCX) are stored.",
     )
 
 
