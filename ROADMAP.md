@@ -146,11 +146,11 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 #### Semana 4 — Parser FIT/TCX y persistencia DuckDB
 **Objetivo:** series temporales segundo a segundo en DuckDB (`RF-01.3`, `RNF-01`).
 
-- [ ] Parser `.FIT` / `.TCX` con `fitparse` extrayendo `HR_t`, `pace_t`, cadencia, altitud.
-- [ ] Modelo de datos OLAP en DuckDB: tablas `exercises`, `samples`, `athlete`.
-- [ ] ETL de normalización y validación de series (outliers, gaps).
-- [ ] Tests de parser con archivos `.FIT` de ejemplo (fixtures).
-- [ ] Hito: una sesión de carrera queda persistida y consultable por SQL.
+- [x] Parser `.FIT` con `fitparse` extrayendo `HR_t`, `pace_t` (velocidad), cadencia y altitud (TCX diferido; el Polar emite FIT).
+- [x] Modelo de datos OLAP en DuckDB: tablas `exercises`, `samples`, `athlete`.
+- [x] ETL de normalización y validación de series (outliers, gaps).
+- [x] Tests de parser con archivos `.FIT` sintéticos generados en test (sin datos biométricos reales).
+- [x] Hito: una sesión de carrera queda persistida y consultable por SQL.
 
 ---
 
@@ -262,7 +262,7 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 
 ### Fase 0 — DoD
 - [x] Se puede autenticar contra Polar AccessLink y persistir tokens.
-- [ ] Una sesión de carrera queda persistida en DuckDB con series segundo a segundo.
+- [x] Una sesión de carrera queda persistida en DuckDB con series segundo a segundo.
 - [x] Entorno Docker reproducible con `docker compose up`.
 - [x] Tests de `src/athlete_stress_sim/core/etl` en verde.
 

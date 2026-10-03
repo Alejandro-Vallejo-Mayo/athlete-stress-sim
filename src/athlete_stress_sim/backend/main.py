@@ -14,8 +14,14 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI
 
-from athlete_stress_sim.backend.api.ingest import get_sync_service
+from athlete_stress_sim.backend.api.ingest import (
+    get_parse_service,
+    get_session_store,
+    get_sync_service,
+    run_ingestion,
+)
 from athlete_stress_sim.backend.api.ingest import router as ingest_router
+from athlete_stress_sim.backend.api.oauth import get_token_store
 from athlete_stress_sim.backend.api.oauth import router as oauth_router
 from athlete_stress_sim.backend.config import physiology, polar
 from athlete_stress_sim.core.etl.polar_client import PolarAuthError
@@ -24,14 +30,19 @@ logger = logging.getLogger(__name__)
 
 
 def _startup_sync() -> None:
-    """Run one catch-up sync, logging instead of raising on failure."""
+    """Run one catch-up sync + parse, logging instead of raising on failure."""
     try:
-        result = get_sync_service().sync()
-        logger.info("Startup sync finished: %s", result.model_dump())
+        result = run_ingestion(
+            get_sync_service(),
+            get_parse_service(),
+            get_session_store(),
+            get_token_store(),
+        )
+        logger.info("Startup ingestion finished: %s", result)
     except PolarAuthError:
-        logger.info("Startup sync skipped: no Polar account linked yet.")
+        logger.info("Startup ingestion skipped: no Polar account linked yet.")
     except Exception:  # noqa: BLE001
-        logger.exception("Startup sync failed")
+        logger.exception("Startup ingestion failed")
 
 
 @asynccontextmanager

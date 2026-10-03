@@ -8,7 +8,7 @@ COMPOSE ?= docker compose -f docker/docker-compose.yml
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install lint format typecheck test test-cov run-backend run-frontend docker-up docker-logs docker-down clean
+.PHONY: help install lint format typecheck test test-cov run-backend run-frontend db docker-up docker-logs docker-down clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -40,6 +40,9 @@ run-backend: ## Start the FastAPI backend in development mode
 
 run-frontend: ## Start the Dash dashboard in development mode
 	$(UV) run python -m athlete_stress_sim.frontend.app
+
+db: ## Open an interactive shell on the local DuckDB (variable `con`)
+	$(UV) run python -i -c "import duckdb; from athlete_stress_sim.backend.config import storage; con = duckdb.connect(str(storage.db_path)); print('Connected to', storage.db_path);"
 
 docker-up: ## Build and start all services (background)
 	@printf "\n\033[1mBuilding and starting services in the background...\033[0m\n"
