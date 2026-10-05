@@ -175,9 +175,10 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 #### Semana 7 — ACWR (EWMA)
 **Objetivo:** evaluar riesgo de lesión (`RF-04.1`, `RF-04.2`).
 
-- [ ] Cálculo de Carga Aguda (EWMA 7 días) y Crónica (EWMA 28 días).
-- [ ] Ratio `ACWR` y matriz de alerta (Sweet Spot / Advertencia / Peligro).
-- [ ] Tests de la serie EWMA y de los umbrales.
+- [x] Cálculo de Carga Aguda (EWMA 7 días) y Crónica (EWMA 28 días), `λ = 2/(N+1)`.
+- [x] Ratio `ACWR` y matriz de alerta (Sweet Spot / Advertencia / Peligro).
+- [x] Ensamblado de carga diaria (TRIMP carrera + sRPE gimnasio) en `core/metrics/load.py`.
+- [x] Tests de la serie EWMA, del agregado diario y de los umbrales.
 
 #### Semana 8 — Modelo Banister (EDO)
 **Objetivo:** modelar Fitness-Fatiga (`RF-03.1`).
