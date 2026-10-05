@@ -12,6 +12,8 @@ from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from athlete_stress_sim.core.metrics.trimp import Sex
+
 
 class PhysiologicalConfig(BaseSettings):
     """Physiological constants and reference parameters of the Banister model."""
@@ -32,7 +34,7 @@ class PhysiologicalConfig(BaseSettings):
     k_1: float = Field(default=1.0, description="Fitness gain.")
     k_2: float = Field(default=2.0, description="Fatigue gain.")
 
-    b: float = Field(default=1.92, description="TRIMP exponential coefficient (1.92 for men).")
+    sex: Sex = Field(default=Sex.MALE, description="Selects the Banister TRIMP coefficients.")
     rpe_alpha: float = Field(default=1.0, gt=0, description="RPE factor exponent (gym).")
 
 

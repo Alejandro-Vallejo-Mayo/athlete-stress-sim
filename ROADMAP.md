@@ -159,9 +159,10 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 #### Semana 5 — TRIMP de carrera (Banister)
 **Objetivo:** cuantificar carga de carrera (`RF-02.1`).
 
-- [ ] Implementar `src/athlete_stress_sim/core/metrics/trimp.py` con `TRIMP = D · HR_r · e^{b·HR_r}`.
-- [ ] Cálculo de `HR_r` a partir de HR media, reposo y máxima.
-- [ ] Tests contra valores de referencia calculados a mano.
+- [x] Implementar `src/athlete_stress_sim/core/metrics/trimp.py` con `TRIMP = D · HR_r · a · e^{b·HR_r}` (hombre: a=0.64, b=1.92; mujer: a=0.86, b=1.67), integrado segundo a segundo.
+- [x] Añadir a `config.py` la variable `sex` (`male`/`female`) para seleccionar los parámetros (a, b).
+- [x] Cálculo de `HR_r` a partir de HR (media y/o por segundo), reposo y máxima.
+- [x] Tests contra valores de referencia calculados a mano (ambos sexos).
 
 #### Semana 6 — TRIMP de gimnasio (RPE)
 **Objetivo:** cuantificar carga de fuerza (`RF-02.2`, `RF-01.4`).
