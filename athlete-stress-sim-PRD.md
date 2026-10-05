@@ -70,7 +70,7 @@ Ingesta de series temporales segundo a segundo:
 
 ### RF-01.4 (Entrenamiento de Gimnasio)
 
-Registro de sesiones con perfil *"Fuerza/Musculación"* y componente interactivo en dashboard para introducir el **RPE (Escala Borg 1-10)** post-entreno.
+Registro de sesiones con perfil *"Fuerza/Musculación"* y componente interactivo en dashboard para introducir el **RPE (escala Borg CR-10, 0–10)** post-entreno.
 
 ---
 
@@ -104,22 +104,15 @@ $$
 
 *(Donde $D$ es la duración en minutos. Puede calcularse de forma integral sobre la serie de FC segundo a segundo en lugar de usar solo la FC media).*
 
-### RF-02.2 (Gimnasio - TRIMP Ajustado por RPE)
+### RF-02.2 (Gimnasio - Carga por RPE de sesión)
+
+Para el entrenamiento de fuerza la FC no refleja bien la carga (es baja y ruidosa), por lo que se emplea el método **session-RPE de Foster**:
 
 $$
-TRIMP_{\text{Gym}}
-=
-D
-\cdot
-\left(
-\frac{HR_{\text{media}} - HR_{\text{reposo}}}
-{HR_{\max} - HR_{\text{reposo}}}
-\right)
-\cdot
-\left(
-\frac{RPE}{10}
-\right)^\alpha
+TRIMP_{\text{Gym}} = RPE \cdot D_{\text{min}}
 $$
+
+donde $RPE$ es la percepción de esfuerzo de toda la sesión en la escala **Borg CR-10 (0–10)** y $D_{\text{min}}$ la duración en minutos. El resultado son unidades arbitrarias (AU) de carga interna, sumables con el TRIMP de carrera.
 
 ---
 

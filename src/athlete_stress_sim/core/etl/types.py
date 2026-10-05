@@ -51,3 +51,20 @@ class ParsedSession(BaseModel):
 
     metadata: SessionMetadata = Field(default_factory=SessionMetadata)
     samples: list[Sample] = Field(default_factory=list)
+
+
+class Exercise(BaseModel):
+    """A persisted exercise summary (row of the ``exercises`` table)."""
+
+    exercise_id: str
+    sport: str = ""
+    sub_sport: str = ""
+    start_time: datetime | None = None
+    duration_s: float | None = None
+    distance_m: float | None = None
+    calories: float | None = None
+    avg_hr: int | None = None
+    max_hr: int | None = None
+    total_ascent_m: float | None = None
+    total_descent_m: float | None = None
+    file_path: str = ""

@@ -8,10 +8,11 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import duckdb
 
-from athlete_stress_sim.core.etl.types import ParsedSession, Sample
+from athlete_stress_sim.core.etl.types import Exercise, ParsedSession, Sample
 
 _ATHLETE_SCHEMA = """
 CREATE TABLE IF NOT EXISTS athlete (
@@ -53,6 +54,14 @@ CREATE TABLE IF NOT EXISTS samples (
 )
 """
 
+_RPE_SCHEMA = """
+CREATE TABLE IF NOT EXISTS session_rpe (
+    exercise_id VARCHAR PRIMARY KEY,
+    rpe DOUBLE NOT NULL,
+    recorded_at TIMESTAMP
+)
+"""
+
 _DEFAULT_ATHLETE_ID = 1
 
 
@@ -74,7 +83,12 @@ class SessionStore:
     def _ensure_schema(self) -> None:
         connection = self._connect()
         try:
-            for statement in (_ATHLETE_SCHEMA, _EXERCISES_SCHEMA, _SAMPLES_SCHEMA):
+            for statement in (
+                _ATHLETE_SCHEMA,
+                _EXERCISES_SCHEMA,
+                _SAMPLES_SCHEMA,
+                _RPE_SCHEMA,
+            ):
                 connection.execute(statement)
         finally:
             connection.close()
@@ -160,6 +174,56 @@ class SessionStore:
         finally:
             connection.close()
 
+    def list_exercises(self) -> list[Exercise]:
+        """Return every persisted exercise, most recent first."""
+        connection = self._connect()
+        try:
+            rows = connection.execute(
+                "SELECT exercise_id, sport, sub_sport, start_time, duration_s, distance_m, "
+                "calories, avg_hr, max_hr, total_ascent_m, total_descent_m, file_path "
+                "FROM exercises ORDER BY start_time DESC"
+            ).fetchall()
+        finally:
+            connection.close()
+        return [_row_to_exercise(row) for row in rows]
+
+    def get_exercise(self, exercise_id: str) -> Exercise | None:
+        """Return one persisted exercise, or ``None`` if unknown."""
+        connection = self._connect()
+        try:
+            row = connection.execute(
+                "SELECT exercise_id, sport, sub_sport, start_time, duration_s, distance_m, "
+                "calories, avg_hr, max_hr, total_ascent_m, total_descent_m, file_path "
+                "FROM exercises WHERE exercise_id = ?",
+                [exercise_id],
+            ).fetchone()
+        finally:
+            connection.close()
+        return _row_to_exercise(row) if row is not None else None
+
+    def set_rpe(self, exercise_id: str, rpe: float) -> None:
+        """Store the session-RPE (Borg CR-10) for an exercise."""
+        connection = self._connect()
+        try:
+            connection.execute(
+                "INSERT OR REPLACE INTO session_rpe VALUES (?, ?, ?)",
+                [exercise_id, rpe, datetime.now(UTC).replace(tzinfo=None)],
+            )
+        finally:
+            connection.close()
+
+    def get_rpe(self, exercise_id: str) -> float | None:
+        """Return the stored session-RPE for an exercise, or ``None``."""
+        connection = self._connect()
+        try:
+            row = connection.execute(
+                "SELECT rpe FROM session_rpe WHERE exercise_id = ?",
+                [exercise_id],
+            ).fetchone()
+        finally:
+            connection.close()
+        return float(row[0]) if row is not None else None
+
     def count_sessions(self) -> int:
         """Number of exercises persisted."""
         connection = self._connect()
@@ -205,3 +269,34 @@ class SessionStore:
             )
             for row in rows
         ]
+
+
+def _row_to_exercise(row: tuple[Any, ...]) -> Exercise:
+    (
+        exercise_id,
+        sport,
+        sub_sport,
+        start_time,
+        duration_s,
+        distance_m,
+        calories,
+        avg_hr,
+        max_hr,
+        total_ascent_m,
+        total_descent_m,
+        file_path,
+    ) = row
+    return Exercise(
+        exercise_id=str(exercise_id),
+        sport=str(sport),
+        sub_sport=str(sub_sport),
+        start_time=start_time,
+        duration_s=duration_s,
+        distance_m=distance_m,
+        calories=calories,
+        avg_hr=avg_hr,
+        max_hr=max_hr,
+        total_ascent_m=total_ascent_m,
+        total_descent_m=total_descent_m,
+        file_path=str(file_path),
+    )

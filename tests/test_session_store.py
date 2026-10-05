@@ -67,3 +67,31 @@ def test_ensure_athlete_creates_a_single_row(tmp_path: Path) -> None:
     store.ensure_athlete("99999999")
 
     assert store.get_athlete() == "56232817"
+
+
+def test_list_and_get_exercise(tmp_path: Path) -> None:
+    store = SessionStore(tmp_path / "sessions.duckdb")
+    store.save_session("abc", _session(), "data/raw/abc.fit")
+
+    exercises = store.list_exercises()
+
+    assert [exercise.exercise_id for exercise in exercises] == ["abc"]
+    exercise = store.get_exercise("abc")
+    assert exercise is not None
+    assert exercise.sport == "running"
+    assert exercise.duration_s == 2.0
+    assert exercise.file_path == "data/raw/abc.fit"
+    assert store.get_exercise("missing") is None
+
+
+def test_rpe_roundtrip_and_overwrite(tmp_path: Path) -> None:
+    store = SessionStore(tmp_path / "sessions.duckdb")
+    store.save_session("abc", _session(), "data/raw/abc.fit")
+
+    assert store.get_rpe("abc") is None
+
+    store.set_rpe("abc", 7.0)
+    assert store.get_rpe("abc") == 7.0
+
+    store.set_rpe("abc", 5.0)
+    assert store.get_rpe("abc") == 5.0

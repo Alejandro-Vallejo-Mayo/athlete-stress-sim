@@ -164,13 +164,13 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 - [x] Cálculo de `HR_r` a partir de HR (media y/o por segundo), reposo y máxima.
 - [x] Tests contra valores de referencia calculados a mano (ambos sexos).
 
-#### Semana 6 — TRIMP de gimnasio (RPE)
+#### Semana 6 — Carga de gimnasio (sRPE de Foster)
 **Objetivo:** cuantificar carga de fuerza (`RF-02.2`, `RF-01.4`).
 
-- [ ] Modelo `TRIMP_gym` ajustado por RPE (Borg 1–10) y exponente `alpha`.
-- [ ] Registro de sesiones de perfil "Fuerza/Musculación" en DuckDB.
-- [ ] API + componente para introducir RPE post-entreno.
-- [ ] Tests del factor RPE.
+- [x] Modelo `TRIMP_gym = RPE · D_min` (session-RPE de Foster, Borg CR-10 0–10) en `core/metrics/rpe.py`.
+- [x] Registro de sesiones de fuerza y del RPE en la tabla `session_rpe` de DuckDB.
+- [x] API para introducir RPE post-entreno (`POST /exercises/{id}/rpe`); componente de dashboard diferido a S11–S13.
+- [x] Tests del cálculo sRPE y de los endpoints.
 
 #### Semana 7 — ACWR (EWMA)
 **Objetivo:** evaluar riesgo de lesión (`RF-04.1`, `RF-04.2`).

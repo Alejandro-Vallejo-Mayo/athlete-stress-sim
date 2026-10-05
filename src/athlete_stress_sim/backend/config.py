@@ -35,7 +35,6 @@ class PhysiologicalConfig(BaseSettings):
     k_2: float = Field(default=2.0, description="Fatigue gain.")
 
     sex: Sex = Field(default=Sex.MALE, description="Selects the Banister TRIMP coefficients.")
-    rpe_alpha: float = Field(default=1.0, gt=0, description="RPE factor exponent (gym).")
 
 
 class PolarConfig(BaseSettings):
