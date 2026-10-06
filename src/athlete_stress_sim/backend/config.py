@@ -33,6 +33,7 @@ class PhysiologicalConfig(BaseSettings):
 
     k_1: float = Field(default=1.0, description="Fitness gain.")
     k_2: float = Field(default=2.0, description="Fatigue gain.")
+    p0: float = Field(default=0.0, description="Baseline performance of the Banister model.")
 
     sex: Sex = Field(default=Sex.MALE, description="Selects the Banister TRIMP coefficients.")
 

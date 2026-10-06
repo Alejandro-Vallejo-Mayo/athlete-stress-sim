@@ -183,10 +183,10 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 #### Semana 8 — Modelo Banister (EDO)
 **Objetivo:** modelar Fitness-Fatiga (`RF-03.1`).
 
-- [ ] Resolver el sistema `dg/dt`, `dh/dt` con `scipy.integrate.odeint`.
-- [ ] Calcular `P(t) = P0 + k1·g(t) − k2·h(t)` y `Freshness`.
-- [ ] Tests de estabilidad y de respuesta a un impulso de carga.
-- [ ] Bench para verificar `RNF-02` (< 0.5 s).
+- [x] Recurrencia exacta (`impulse_response`) + resolución numérica con `scipy.integrate.solve_ivp` (`odeint` deprecado).
+- [x] Calcular `P(t) = P0 + k1·g(t) − k2·h(t)` y `Freshness`.
+- [x] Tests de estabilidad y de respuesta a un impulso de carga.
+- [x] Bench para verificar `RNF-02` (< 0.5 s).
 
 #### Semana 9 — Filtro de Kalman Extendido (EKF)
 **Objetivo:** ajustar parámetros individuales (`RF-03.2`).
@@ -270,8 +270,8 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 
 ### Fase 1 — DoD
 - [ ] TRIMP (carrera y gym), ACWR, EDO Banister y EKF implementados y testeados.
-- [ ] Cobertura de `src/athlete_stress_sim/core` ≥ 80 %.
-- [ ] Simulación EDO < 0.5 s.
+- [x] Cobertura de `src/athlete_stress_sim/core` ≥ 80 %.
+- [x] Simulación EDO < 0.5 s.
 
 ### Fase 2 — DoD
 - [ ] API FastAPI sirve métricas y simulaciones.

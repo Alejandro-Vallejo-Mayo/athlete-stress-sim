@@ -84,7 +84,7 @@ files = ["src"]
 exclude = ["^\\.venv/"]
 
 [[tool.mypy.overrides]]
-module = ["filterpy.*", "fitparse.*", "dash_mantine_components.*"]
+module = ["filterpy.*", "fitparse.*", "dash_mantine_components.*", "scipy.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
