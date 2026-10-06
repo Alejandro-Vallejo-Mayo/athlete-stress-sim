@@ -10,6 +10,7 @@ authors = [
 ]
 keywords = ["running", "fatigue", "trimp", "acwr", "banister", "polar"]
 dependencies = [
+    "numpy>=1.26",
     "scipy>=1.11",
     "statsmodels>=0.14",
     "filterpy>=1.4.5",

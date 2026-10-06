@@ -191,9 +191,9 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 #### Semana 9 — Filtro de Kalman Extendido (EKF)
 **Objetivo:** ajustar parámetros individuales (`RF-03.2`).
 
-- [ ] Implementar EKF con `filterpy` para estimar `k_1, k_2, tau_1, tau_2`.
-- [ ] Integrar observaciones de rendimiento (ritmo a pulso constante).
-- [ ] Tests con datos sintéticos (convergencia de parámetros).
+- [x] Implementar EKF con `filterpy` para estimar `k_1, k_2, tau_1, tau_2` (estado aumentado).
+- [x] Integrar observaciones de rendimiento (el EKF las consume; la extracción real de ritmo a HR constante se difiere a S14).
+- [x] Tests con datos sintéticos (convergencia de parámetros).
 
 ---
 
@@ -269,7 +269,7 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 - [x] Tests de `src/athlete_stress_sim/core/etl` en verde.
 
 ### Fase 1 — DoD
-- [ ] TRIMP (carrera y gym), ACWR, EDO Banister y EKF implementados y testeados.
+- [x] TRIMP (carrera y gym), ACWR, EDO Banister y EKF implementados y testeados.
 - [x] Cobertura de `src/athlete_stress_sim/core` ≥ 80 %.
 - [x] Simulación EDO < 0.5 s.
 
