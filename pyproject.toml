@@ -10,6 +10,7 @@ authors = [
 ]
 keywords = ["running", "fatigue", "trimp", "acwr", "banister", "polar"]
 dependencies = [
+    "numpy>=1.26",
     "scipy>=1.11",
     "statsmodels>=0.14",
     "filterpy>=1.4.5",
@@ -84,7 +85,7 @@ files = ["src"]
 exclude = ["^\\.venv/"]
 
 [[tool.mypy.overrides]]
-module = ["filterpy.*", "fitparse.*", "dash_mantine_components.*"]
+module = ["filterpy.*", "fitparse.*", "dash_mantine_components.*", "scipy.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

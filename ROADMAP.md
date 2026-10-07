@@ -159,39 +159,41 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 #### Semana 5 — TRIMP de carrera (Banister)
 **Objetivo:** cuantificar carga de carrera (`RF-02.1`).
 
-- [ ] Implementar `src/athlete_stress_sim/core/metrics/trimp.py` con `TRIMP = D · HR_r · e^{b·HR_r}`.
-- [ ] Cálculo de `HR_r` a partir de HR media, reposo y máxima.
-- [ ] Tests contra valores de referencia calculados a mano.
+- [x] Implementar `src/athlete_stress_sim/core/metrics/trimp.py` con `TRIMP = D · HR_r · a · e^{b·HR_r}` (hombre: a=0.64, b=1.92; mujer: a=0.86, b=1.67), integrado segundo a segundo.
+- [x] Añadir a `config.py` la variable `sex` (`male`/`female`) para seleccionar los parámetros (a, b).
+- [x] Cálculo de `HR_r` a partir de HR (media y/o por segundo), reposo y máxima.
+- [x] Tests contra valores de referencia calculados a mano (ambos sexos).
 
-#### Semana 6 — TRIMP de gimnasio (RPE)
+#### Semana 6 — Carga de gimnasio (sRPE de Foster)
 **Objetivo:** cuantificar carga de fuerza (`RF-02.2`, `RF-01.4`).
 
-- [ ] Modelo `TRIMP_gym` ajustado por RPE (Borg 1–10) y exponente `alpha`.
-- [ ] Registro de sesiones de perfil "Fuerza/Musculación" en DuckDB.
-- [ ] API + componente para introducir RPE post-entreno.
-- [ ] Tests del factor RPE.
+- [x] Modelo `TRIMP_gym = RPE · D_min` (session-RPE de Foster, Borg CR-10 0–10) en `core/metrics/rpe.py`.
+- [x] Registro de sesiones de fuerza y del RPE en la tabla `session_rpe` de DuckDB.
+- [x] API para introducir RPE post-entreno (`POST /exercises/{id}/rpe`); componente de dashboard diferido a S11–S13.
+- [x] Tests del cálculo sRPE y de los endpoints.
 
 #### Semana 7 — ACWR (EWMA)
 **Objetivo:** evaluar riesgo de lesión (`RF-04.1`, `RF-04.2`).
 
-- [ ] Cálculo de Carga Aguda (EWMA 7 días) y Crónica (EWMA 28 días).
-- [ ] Ratio `ACWR` y matriz de alerta (Sweet Spot / Advertencia / Peligro).
-- [ ] Tests de la serie EWMA y de los umbrales.
+- [x] Cálculo de Carga Aguda (EWMA 7 días) y Crónica (EWMA 28 días), `λ = 2/(N+1)`.
+- [x] Ratio `ACWR` y matriz de alerta (Sweet Spot / Advertencia / Peligro).
+- [x] Ensamblado de carga diaria (TRIMP carrera + sRPE gimnasio) en `core/metrics/load.py`.
+- [x] Tests de la serie EWMA, del agregado diario y de los umbrales.
 
 #### Semana 8 — Modelo Banister (EDO)
 **Objetivo:** modelar Fitness-Fatiga (`RF-03.1`).
 
-- [ ] Resolver el sistema `dg/dt`, `dh/dt` con `scipy.integrate.odeint`.
-- [ ] Calcular `P(t) = P0 + k1·g(t) − k2·h(t)` y `Freshness`.
-- [ ] Tests de estabilidad y de respuesta a un impulso de carga.
-- [ ] Bench para verificar `RNF-02` (< 0.5 s).
+- [x] Recurrencia exacta (`impulse_response`) + resolución numérica con `scipy.integrate.solve_ivp` (`odeint` deprecado).
+- [x] Calcular `P(t) = P0 + k1·g(t) − k2·h(t)` y `Freshness`.
+- [x] Tests de estabilidad y de respuesta a un impulso de carga.
+- [x] Bench para verificar `RNF-02` (< 0.5 s).
 
 #### Semana 9 — Filtro de Kalman Extendido (EKF)
 **Objetivo:** ajustar parámetros individuales (`RF-03.2`).
 
-- [ ] Implementar EKF con `filterpy` para estimar `k_1, k_2, tau_1, tau_2`.
-- [ ] Integrar observaciones de rendimiento (ritmo a pulso constante).
-- [ ] Tests con datos sintéticos (convergencia de parámetros).
+- [x] Implementar EKF con `filterpy` para estimar `k_1, k_2, tau_1, tau_2` (estado aumentado).
+- [x] Integrar observaciones de rendimiento (el EKF las consume; la extracción real de ritmo a HR constante se difiere a S14).
+- [x] Tests con datos sintéticos (convergencia de parámetros).
 
 ---
 
@@ -267,9 +269,9 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 - [x] Tests de `src/athlete_stress_sim/core/etl` en verde.
 
 ### Fase 1 — DoD
-- [ ] TRIMP (carrera y gym), ACWR, EDO Banister y EKF implementados y testeados.
-- [ ] Cobertura de `src/athlete_stress_sim/core` ≥ 80 %.
-- [ ] Simulación EDO < 0.5 s.
+- [x] TRIMP (carrera y gym), ACWR, EDO Banister y EKF implementados y testeados.
+- [x] Cobertura de `src/athlete_stress_sim/core` ≥ 80 %.
+- [x] Simulación EDO < 0.5 s.
 
 ### Fase 2 — DoD
 - [ ] API FastAPI sirve métricas y simulaciones.

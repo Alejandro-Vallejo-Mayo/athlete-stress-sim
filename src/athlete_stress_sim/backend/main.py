@@ -14,6 +14,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI
 
+from athlete_stress_sim.backend.api.exercises import router as exercises_router
 from athlete_stress_sim.backend.api.ingest import (
     get_parse_service,
     get_session_store,
@@ -65,6 +66,7 @@ app = FastAPI(
 
 app.include_router(oauth_router)
 app.include_router(ingest_router)
+app.include_router(exercises_router)
 
 
 @app.get("/health", tags=["system"])

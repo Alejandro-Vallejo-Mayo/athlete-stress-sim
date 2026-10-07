@@ -21,7 +21,7 @@ En el entrenamiento de resistencia e híbrido (carrera a pie + gimnasio), la may
 `Athleta-Stress-Sim` es una plataforma end-to-end de análisis fisiológico personal que:
 
 1. Ingesta y procesa automáticamente la telemetría de entrenamientos desde la **API oficial de Polar AccessLink** al sincronizar el reloj Polar Ignite.
-2. Cuantifica la carga de entrenamiento (**TRIMP de Banister/Edwards**) integrando tanto las sesiones de carrera como el entrenamiento de fuerza ajustado por RPE.
+2. Cuantifica la carga de entrenamiento (**TRIMP de Banister**) integrando tanto las sesiones de carrera como el entrenamiento de fuerza ajustado por RPE.
 3. Modela la dinámica **Fitness-Fatiga** mediante **Ecuaciones Diferenciales Ordinarias (EDO)** y ajusta los parámetros fisiológicos individuales usando un **Filtro de Kalman Extendido (EKF)**.
 4. Evalúa el riesgo de lesión mediante la ratio de Carga Aguda/Crónica (**ACWR**).
 5. Ofrece un **Dashboard Interactivo de Rendimiento y Simulador de Tapering** para planificar cargas y optimizar la puesta a punto de cara a la Media Maratón.
@@ -70,7 +70,7 @@ Ingesta de series temporales segundo a segundo:
 
 ### RF-01.4 (Entrenamiento de Gimnasio)
 
-Registro de sesiones con perfil *"Fuerza/Musculación"* y componente interactivo en dashboard para introducir el **RPE (Escala Borg 1-10)** post-entreno.
+Registro de sesiones con perfil *"Fuerza/Musculación"* y componente interactivo en dashboard para introducir el **RPE (escala Borg CR-10, 0–10)** post-entreno.
 
 ---
 
@@ -88,31 +88,31 @@ $$
 HR_r = \frac{HR_{\text{media}} - HR_{\text{reposo}}}{HR_{\max} - HR_{\text{reposo}}}
 $$
 
-y
+y el factor de ponderación $y$ (ajustado al perfil lactato–FC de Banister) es
 
 $$
-y = e^{b \cdot HR_r}
-\qquad (b = 1.92 \text{ para hombres})
+y = a \cdot e^{b \cdot HR_r}
 $$
 
-*(Donde $D$ es la duración en minutos).*
-
-### RF-02.2 (Gimnasio - TRIMP Ajustado por RPE)
+con los parámetros según sexo:
 
 $$
-TRIMP_{\text{Gym}}
-=
-D
-\cdot
-\left(
-\frac{HR_{\text{media}} - HR_{\text{reposo}}}
-{HR_{\max} - HR_{\text{reposo}}}
-\right)
-\cdot
-\left(
-\frac{RPE}{10}
-\right)^\alpha
+a = 0.64,\; b = 1.92 \quad (\text{hombres})
+\qquad
+a = 0.86,\; b = 1.67 \quad (\text{mujeres})
 $$
+
+*(Donde $D$ es la duración en minutos. Puede calcularse de forma integral sobre la serie de FC segundo a segundo en lugar de usar solo la FC media).*
+
+### RF-02.2 (Gimnasio - Carga por RPE de sesión)
+
+Para el entrenamiento de fuerza la FC no refleja bien la carga (es baja y ruidosa), por lo que se emplea el método **session-RPE de Foster**:
+
+$$
+TRIMP_{\text{Gym}} = RPE \cdot D_{\text{min}}
+$$
+
+donde $RPE$ es la percepción de esfuerzo de toda la sesión en la escala **Borg CR-10 (0–10)** y $D_{\text{min}}$ la duración en minutos. El resultado son unidades arbitrarias (AU) de carga interna, sumables con el TRIMP de carrera.
 
 ---
 
