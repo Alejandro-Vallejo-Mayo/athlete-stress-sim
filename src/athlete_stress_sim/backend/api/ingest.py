@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from athlete_stress_sim.backend.api.oauth import get_oauth_client, get_token_store
 from athlete_stress_sim.backend.config import polar, storage
 from athlete_stress_sim.core.etl.parse_service import ParseResult, ParseService
-from athlete_stress_sim.core.etl.polar_client import PolarAuthError, PolarClient
+from athlete_stress_sim.core.etl.polar_client import PolarAPIError, PolarAuthError, PolarClient
 from athlete_stress_sim.core.etl.polar_oauth import TokenManager
 from athlete_stress_sim.core.etl.sync_service import SyncResult, SyncService
 from athlete_stress_sim.core.storage.ingest_store import IngestStatus, IngestStore
@@ -84,6 +84,8 @@ def run_sync(
         return run_ingestion(sync_service, parse_service, session_store, token_store)
     except PolarAuthError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except PolarAPIError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @router.get("/sync/status")
