@@ -210,9 +210,9 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 #### Semana 11 — Dashboard (skeleton + panel de estado)
 **Objetivo:** estructura visual y panel diario (`RF-05.1`).
 
-- [ ] App `src/athlete_stress_sim/frontend/app.py` con Plotly Dash + Mantine (tema oscuro, `RNF-04`).
-- [ ] Semáforo de *Readiness Score* y métrica de *Freshness*.
-- [ ] Layout responsive y componentes base.
+- [x] App `src/athlete_stress_sim/frontend/app.py` con Plotly Dash + Mantine (tema oscuro, `RNF-04`).
+- [x] Semáforo de *Readiness Score* y métrica de *Freshness* (`frontend/readiness.py`, `frontend/components/status.py`).
+- [x] Layout responsive y componentes base (cliente HTTP `frontend/api.py`, carga inicial + botón Refresh).
 
 #### Semana 12 — Dashboard (Fitness-Fatiga + ACWR)
 **Objetivo:** visualizar la dinámica del modelo.
