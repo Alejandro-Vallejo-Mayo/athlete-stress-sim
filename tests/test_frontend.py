@@ -99,6 +99,34 @@ def test_metrics_client_raises_on_error_status() -> None:
         _client(handler).get_acwr()
 
 
+def test_metrics_client_gets_running_exercises() -> None:
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        assert request.url.path == "/exercises"
+        assert request.url.params.get("kind") == "run"
+        return httpx2.Response(200, json=[{"exercise_id": "run1", "sport": "running"}])
+
+    exercises = _client(handler).get_exercises("run")
+
+    assert exercises[0].exercise_id == "run1"
+
+
+def test_metrics_client_gets_decoupling() -> None:
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        assert request.url.path == "/metrics/decoupling/run1"
+        return httpx2.Response(
+            200,
+            json={
+                "exercise_id": "run1",
+                "efficiency_per_km": [0.02, 0.018],
+                "decoupling_pct": 10.0,
+            },
+        )
+
+    response = _client(handler).get_decoupling("run1")
+
+    assert response.decoupling_pct == pytest.approx(10.0)
+
+
 def test_metrics_client_posts_taper() -> None:
     def handler(request: httpx2.Request) -> httpx2.Response:
         assert request.method == "POST"

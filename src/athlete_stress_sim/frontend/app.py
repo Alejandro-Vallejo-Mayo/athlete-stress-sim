@@ -1,8 +1,9 @@
-"""Plotly Dash application: physiological dashboard and tapering simulator (S13).
+"""Plotly Dash application: physiological dashboard, simulator and decoupling.
 
 Renders the daily readiness panel (S11), the fitness-fatigue time series and the
-ACWR risk gauge (S12), and the tapering simulator (S13), all fetched from the
-backend metrics API in a dark theme (``RNF-04``).
+ACWR risk gauge (S12), the tapering simulator (S13) and the aerobic-decoupling
+panel (``RF-05.3``), all fetched from the backend metrics API in a dark theme
+(``RNF-04``).
 """
 
 from __future__ import annotations
@@ -13,12 +14,19 @@ import dash
 import dash_mantine_components as dmc
 from dash import Input, Output, State, ctx, dcc, html
 
+from athlete_stress_sim.backend.schemas.exercises import ExerciseOut
 from athlete_stress_sim.backend.schemas.metrics import (
     BanisterSeriesResponse,
+    DecouplingResponse,
     TaperSimulationResponse,
 )
 from athlete_stress_sim.frontend.api import MetricsClient, MetricsClientError
 from athlete_stress_sim.frontend.components.acwr_gauge import build_acwr_gauge
+from athlete_stress_sim.frontend.components.decoupling import (
+    build_decoupling_figure,
+    decoupling_panel,
+    decoupling_status_text,
+)
 from athlete_stress_sim.frontend.components.fitness_chart import build_fitness_figure
 from athlete_stress_sim.frontend.components.simulator import (
     SessionData,
@@ -30,23 +38,35 @@ from athlete_stress_sim.frontend.components.simulator import (
 from athlete_stress_sim.frontend.components.status import status_panel
 from athlete_stress_sim.frontend.readiness import readiness_level
 
-DashboardOutputs = tuple[object, object, object]
+DashboardOutputs = tuple[object, object, object, list[dict[str, str]], str | None]
 SessionOutputs = tuple[object, object, object, object, object, object, object]
 
 
-def _load_dashboard(client: MetricsClient) -> DashboardOutputs:
-    """Fetch both metric series and build the three dashboard panels."""
+def _run_option(exercise: ExerciseOut) -> dict[str, str]:
+    """Build one selectable option for the decoupling run selector."""
+    when = exercise.start_time.date().isoformat() if exercise.start_time else "unknown"
+    distance = f"{exercise.distance_m / 1000.0:.1f} km" if exercise.distance_m else "no distance"
+    return {"value": exercise.exercise_id, "label": f"{when} · {distance}"}
+
+
+def _load_dashboard(client: MetricsClient, current_run: str | None) -> DashboardOutputs:
+    """Fetch the metric series and the run list, keeping the current selection."""
     series = client.get_banister()
     points = client.get_acwr().points
+    options = [_run_option(exercise) for exercise in client.get_exercises("run")]
     if series.freshness:
         freshness = series.freshness[-1]
         panel = status_panel(readiness_level(freshness), freshness)
     else:
         panel = status_panel(None, None)
+    valid = {option["value"] for option in options}
+    selected = current_run if current_run in valid else (options[0]["value"] if options else None)
     return (
         cast(object, panel),
         cast(object, build_fitness_figure(series)),
         cast(object, build_acwr_gauge(points)),
+        options,
+        selected,
     )
 
 
@@ -56,6 +76,8 @@ def _empty_dashboard() -> DashboardOutputs:
         cast(object, status_panel(None, None)),
         cast(object, build_fitness_figure(BanisterSeriesResponse())),
         cast(object, build_acwr_gauge([])),
+        [],
+        None,
     )
 
 
@@ -90,6 +112,7 @@ def create_app(client: MetricsClient | None = None) -> dash.Dash:
                         cols={"base": 1, "md": 2},
                         spacing="md",
                     ),
+                    decoupling_panel(),
                     simulator_panel(),
                     dcc.Store(id="sim-sessions", data=[]),
                     dcc.Interval(id="init", interval=1, max_intervals=1),
@@ -105,15 +128,46 @@ def create_app(client: MetricsClient | None = None) -> dash.Dash:
         Output("status-panel", "children"),
         Output("fitness-chart", "figure"),
         Output("acwr-gauge", "figure"),
+        Output("decoupling-run", "data"),
+        Output("decoupling-run", "value"),
         Input("init", "n_intervals"),
         Input("refresh-btn", "n_clicks"),
+        State("decoupling-run", "value"),
     )
-    def refresh_dashboard(_interval: int | None, _clicks: int | None) -> DashboardOutputs:
+    def refresh_dashboard(
+        _interval: int | None,
+        _clicks: int | None,
+        current_run: str | None,
+    ) -> DashboardOutputs:
         """Reload the dashboard on first paint and on manual refresh."""
         try:
-            return _load_dashboard(metrics_client)
+            return _load_dashboard(metrics_client, current_run)
         except MetricsClientError:
             return _empty_dashboard()
+
+    @app.callback(
+        Output("decoupling-chart", "figure"),
+        Output("decoupling-status", "children"),
+        Input("decoupling-run", "value"),
+    )
+    def render_decoupling(exercise_id: str | None) -> tuple[object, object]:
+        """Render the per-kilometre efficiency of the selected run."""
+        if exercise_id is None:
+            return (
+                cast(object, build_decoupling_figure(DecouplingResponse(exercise_id=""))),
+                "No runs available.",
+            )
+        try:
+            response = metrics_client.get_decoupling(exercise_id)
+        except MetricsClientError:
+            return (
+                cast(object, build_decoupling_figure(DecouplingResponse(exercise_id=exercise_id))),
+                "Backend offline.",
+            )
+        return (
+            cast(object, build_decoupling_figure(response)),
+            decoupling_status_text(response),
+        )
 
     @app.callback(
         Output("sim-sessions", "data"),

@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
 
 from athlete_stress_sim.backend.api.ingest import get_session_store
+from athlete_stress_sim.backend.schemas.exercises import ExerciseOut, RpeInput
 from athlete_stress_sim.core.etl.sports import is_strength
 from athlete_stress_sim.core.etl.types import Exercise
 from athlete_stress_sim.core.metrics.rpe import session_rpe_load
@@ -17,26 +16,6 @@ from athlete_stress_sim.core.storage.session_store import SessionStore
 router = APIRouter(prefix="/exercises", tags=["exercises"])
 
 SessionStoreDep = Annotated[SessionStore, Depends(get_session_store)]
-
-
-class RpeInput(BaseModel):
-    """Request body to record a session's RPE."""
-
-    rpe: float = Field(ge=0, le=10, description="Borg CR-10 session RPE (0-10).")
-
-
-class ExerciseOut(BaseModel):
-    """Exercise summary with its RPE and computed strength load, if any."""
-
-    exercise_id: str
-    sport: str = ""
-    sub_sport: str = ""
-    start_time: datetime | None = None
-    duration_s: float | None = None
-    distance_m: float | None = None
-    avg_hr: int | None = None
-    rpe: float | None = None
-    load: float | None = None
 
 
 def _to_out(exercise: Exercise, rpe: float | None) -> ExerciseOut:
@@ -59,12 +38,15 @@ def _to_out(exercise: Exercise, rpe: float | None) -> ExerciseOut:
 @router.get("")
 def list_exercises(
     store: SessionStoreDep,
-    kind: Literal["all", "gym"] = "all",
+    kind: Literal["all", "gym", "run"] = "all",
 ) -> list[ExerciseOut]:
-    """List persisted exercises, optionally only strength/gym sessions."""
+    """List persisted exercises, optionally only running or strength sessions."""
     result: list[ExerciseOut] = []
     for exercise in store.list_exercises():
-        if kind == "gym" and not is_strength(exercise.sport, exercise.sub_sport):
+        strength = is_strength(exercise.sport, exercise.sub_sport)
+        if kind == "gym" and not strength:
+            continue
+        if kind == "run" and strength:
             continue
         result.append(_to_out(exercise, store.get_rpe(exercise.exercise_id)))
     return result

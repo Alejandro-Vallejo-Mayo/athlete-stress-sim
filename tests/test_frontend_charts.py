@@ -9,10 +9,15 @@ import pytest
 from athlete_stress_sim.backend.schemas.metrics import (
     AcwrPoint,
     BanisterSeriesResponse,
+    DecouplingResponse,
     TaperSimulationResponse,
 )
 from athlete_stress_sim.core.metrics.acwr import RiskZone
 from athlete_stress_sim.frontend.components.acwr_gauge import ZONE_META, build_acwr_gauge
+from athlete_stress_sim.frontend.components.decoupling import (
+    build_decoupling_figure,
+    decoupling_status_text,
+)
 from athlete_stress_sim.frontend.components.fitness_chart import build_fitness_figure
 from athlete_stress_sim.frontend.components.simulator import build_taper_figure, sessions_from_store
 
@@ -98,6 +103,32 @@ def test_taper_figure_empty_shows_placeholder() -> None:
 
     assert len(figure.data) == 0
     assert figure.layout.annotations[0].text == "No data yet."
+
+
+def test_decoupling_figure_has_one_bar_per_km() -> None:
+    response = DecouplingResponse(
+        exercise_id="run1", efficiency_per_km=[0.02, 0.018], decoupling_pct=10.0
+    )
+
+    figure = build_decoupling_figure(response)
+
+    assert len(figure.data) == 1
+    assert list(figure.data[0].x) == [1, 2]
+    assert [float(value) for value in figure.data[0].y] == [0.02, 0.018]
+    assert figure.layout.annotations[0].text == "Decoupling: +10.0% (EF fell in the second half)."
+
+
+def test_decoupling_figure_empty_shows_placeholder() -> None:
+    figure = build_decoupling_figure(DecouplingResponse(exercise_id="run1"))
+
+    assert len(figure.data) == 0
+    assert figure.layout.annotations[0].text == "No data yet."
+
+
+def test_decoupling_status_text_without_data() -> None:
+    response = DecouplingResponse(exercise_id="run1")
+
+    assert decoupling_status_text(response) == "Not enough data to compute decoupling."
 
 
 def test_sessions_from_store_parses_and_skips_invalid() -> None:

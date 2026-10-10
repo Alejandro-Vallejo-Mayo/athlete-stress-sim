@@ -226,7 +226,7 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 
 - [x] Entrada de entrenamientos futuros proyectados (ej. "12 km a 5:00/km") vía formulario (`frontend/components/simulator.py`) + `POST /simulate/taper` (sRPE `RPE × duración`).
 - [x] Gráfico predictivo de fatiga/forma hasta el día de la Media Maratón (histórico sólido + pronóstico discontinuo).
-- [x] Métrica de desacoplamiento aeróbico `EF = velocidad / HR` por kilómetros (`core/metrics/decoupling.py` + `GET /metrics/decoupling/{id}`).
+- [x] Métrica de desacoplamiento aeróbico `EF = velocidad / HR` por kilómetros (`core/metrics/decoupling.py` + `GET /metrics/decoupling/{id}`), visible en el dashboard (`frontend/components/decoupling.py`).
 - [x] Tests del simulador y de la métrica EF.
 
 ---
@@ -275,7 +275,7 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 
 ### Fase 2 — DoD
 - [x] API FastAPI sirve métricas y simulaciones.
-- [x] Dashboard (dark mode) muestra estado fisiológico, Fitness/Fatiga/Forma, ACWR y simulador de tapering.
+- [x] Dashboard (dark mode) muestra estado fisiológico, Fitness/Fatiga/Forma, ACWR, desacoplamiento aeróbico y simulador de tapering.
 - [x] End-to-end: dashboard ↔ API ↔ DuckDB funcional.
 
 ### Fase 3 — DoD

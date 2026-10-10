@@ -12,10 +12,13 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 
 import httpx2
+from pydantic import TypeAdapter
 
+from athlete_stress_sim.backend.schemas.exercises import ExerciseOut
 from athlete_stress_sim.backend.schemas.metrics import (
     AcwrResponse,
     BanisterSeriesResponse,
+    DecouplingResponse,
     PlannedSession,
     TaperSimulationRequest,
     TaperSimulationResponse,
@@ -50,6 +53,15 @@ class MetricsClient:
     def get_acwr(self) -> AcwrResponse:
         """Fetch the daily acute:chronic workload ratio series from the backend."""
         return AcwrResponse.model_validate(self._get("/metrics/acwr"))
+
+    def get_exercises(self, kind: str = "run") -> list[ExerciseOut]:
+        """Fetch the persisted exercises, optionally filtered by ``kind``."""
+        payload = self._get(f"/exercises?kind={kind}")
+        return TypeAdapter(list[ExerciseOut]).validate_python(payload)
+
+    def get_decoupling(self, exercise_id: str) -> DecouplingResponse:
+        """Fetch the per-kilometre efficiency and aerobic decoupling of an exercise."""
+        return DecouplingResponse.model_validate(self._get(f"/metrics/decoupling/{exercise_id}"))
 
     def post_taper(self, sessions: list[PlannedSession]) -> TaperSimulationResponse:
         """Project the fitness-fatigue model over the given planned sessions."""
