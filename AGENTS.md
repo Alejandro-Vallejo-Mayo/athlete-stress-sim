@@ -35,12 +35,14 @@ Python 3.12.
 ## Architecture
 
 - `backend/` — FastAPI app in `main.py` (module-level `app`; console script `athlete-stress-sim`).
-  Routers: `api/oauth.py`, `api/ingest.py`, `api/exercises.py`. Config in `config.py`.
+  Routers: `api/oauth.py`, `api/ingest.py`, `api/exercises.py`, `api/metrics.py` (`/metrics/*`
+  + `/simulate`); request/response models live in `schemas/`. Config in `config.py`.
 - `core/etl/` — Polar OAuth2 client, catch-up sync, FIT parser, normalization.
 - `core/storage/` — DuckDB stores: `session_store` (tables `athlete`, `exercises`, `samples`,
   `session_rpe`), `ingest_store` (ingest log/queue), `token_store`.
 - `core/metrics/` — `trimp`, `rpe`, `acwr`, `load`; `core/models/` — `banister` (ODE), `ekf`.
-- `frontend/app.py` — Dash + Mantine skeleton (dark theme).
+- `frontend/` — Dash + Mantine dashboard (dark theme); `api.py` fetches the backend over HTTP
+  (`API_URL`, default `http://localhost:8000`), panels live in `components/`.
 - Config uses pydantic-settings with env prefixes `ATHLETE_` / `POLAR_`; `.env` is git-ignored
   (copy `.env.example`). `/config/physiology` exposes the active non-secret constants.
 
@@ -52,7 +54,7 @@ Python 3.12.
   the network. Keep that when adding tests that import the app.
 - FIT fixtures are synthesized in memory by `tests/helpers/fit_fixture.py`; never commit real
   biometric data (`RNF-01`).
-- Trace work to `ROADMAP.md` sprints/DoD. Status: S1–S9 (Phases 0–1) complete; S10–S16 (API,
-  dashboard, real-data validation, public README) pending.
+- Trace work to `ROADMAP.md` sprints/DoD. Status: S1–S12 complete; S13–S16 (tapering simulator
+  + aerobic decoupling, real-data validation, Docker/CI polish, public README) pending.
 - Conventional commits (`feat:`, `refactor:`, ...). CI triggers on `main`/`develop`/`feature/**`
   and on PRs to `main`/`develop`.

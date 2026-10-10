@@ -20,6 +20,7 @@ dependencies = [
     "uvicorn[standard]>=0.30",
     "dash>=2.17",
     "dash-mantine-components>=1.0",
+    "plotly>=6.0",
     "pydantic>=2.7",
     "pydantic-settings>=2.2",
     "python-dotenv>=1.0",
@@ -85,7 +86,7 @@ files = ["src"]
 exclude = ["^\\.venv/"]
 
 [[tool.mypy.overrides]]
-module = ["filterpy.*", "fitparse.*", "dash_mantine_components.*", "scipy.*"]
+module = ["filterpy.*", "fitparse.*", "dash_mantine_components.*", "plotly.*", "scipy.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

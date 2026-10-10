@@ -217,9 +217,9 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 #### Semana 12 — Dashboard (Fitness-Fatiga + ACWR)
 **Objetivo:** visualizar la dinámica del modelo.
 
-- [ ] Gráfico de Fitness / Fatiga / Forma (TSB) a lo largo del tiempo.
-- [ ] Tacómetro de riesgo ACWR con matriz de colores.
-- [ ] Panel de estado fisiológico completo y conectado a la API.
+- [x] Gráfico de Fitness / Fatiga / Forma (TSB) a lo largo del tiempo (`frontend/components/fitness_chart.py`).
+- [x] Tacómetro de riesgo ACWR con matriz de colores (`frontend/components/acwr_gauge.py`).
+- [x] Panel de estado fisiológico completo y conectado a la API (`frontend/app.py`).
 
 #### Semana 13 — Simulador de tapering y desacoplamiento
 **Objetivo:** planificación predictiva (`RF-05.2`, `RF-05.3`).
