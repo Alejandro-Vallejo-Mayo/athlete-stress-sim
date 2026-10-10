@@ -202,10 +202,10 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 #### Semana 10 — Backend FastAPI
 **Objetivo:** exponer métricas y simulaciones (`RF-05`).
 
-- [ ] Endpoints REST: `/metrics/trimp`, `/metrics/acwr`, `/metrics/banister`, `/simulate`.
-- [ ] Modelos Pydantic (`src/athlete_stress_sim/backend/schemas/`) de request/response.
-- [ ] Integración con DuckDB y el motor fisiológico.
-- [ ] Tests de integración de la API.
+- [x] Endpoints REST: `/metrics/trimp/{exercise_id}`, `/metrics/acwr`, `/metrics/banister`, `/simulate`.
+- [x] Modelos Pydantic (`src/athlete_stress_sim/backend/schemas/metrics.py`) de request/response.
+- [x] Integración con DuckDB y el motor fisiológico.
+- [x] Tests de integración de la API (`tests/test_metrics_api.py`).
 
 #### Semana 11 — Dashboard (skeleton + panel de estado)
 **Objetivo:** estructura visual y panel diario (`RF-05.1`).
