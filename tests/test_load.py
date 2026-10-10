@@ -6,7 +6,11 @@ from datetime import date
 
 import pytest
 
-from athlete_stress_sim.core.metrics.load import daily_load_series, session_load
+from athlete_stress_sim.core.metrics.load import (
+    daily_load_series,
+    planned_session_load,
+    session_load,
+)
 from athlete_stress_sim.core.metrics.trimp import Sex
 
 _HR_REST = 40.0
@@ -80,3 +84,20 @@ def test_daily_load_series_sums_same_day_and_fills_gaps() -> None:
 
 def test_daily_load_series_empty() -> None:
     assert daily_load_series([]) == ([], [])
+
+
+def test_planned_session_load_uses_srpe_with_derived_duration() -> None:
+    load = planned_session_load(distance_km=10.0, pace_min_per_km=5.0, rpe=6.0)
+
+    assert load == pytest.approx(300.0)
+
+
+@pytest.mark.parametrize(
+    ("distance_km", "pace_min_per_km", "rpe"),
+    [(0.0, 5.0, 6.0), (10.0, 0.0, 6.0), (10.0, 5.0, 11.0)],
+)
+def test_planned_session_load_rejects_invalid_inputs(
+    distance_km: float, pace_min_per_km: float, rpe: float
+) -> None:
+    with pytest.raises(ValueError, match="must"):
+        planned_session_load(distance_km=distance_km, pace_min_per_km=pace_min_per_km, rpe=rpe)

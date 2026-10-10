@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import date
 
 import httpx2
 import pytest
 
+from athlete_stress_sim.backend.schemas.metrics import PlannedSession
 from athlete_stress_sim.frontend import app as frontend_app
 from athlete_stress_sim.frontend.api import MetricsClient, MetricsClientError
 from athlete_stress_sim.frontend.readiness import Readiness, readiness_level
@@ -19,6 +21,10 @@ def _client(handler: Handler) -> MetricsClient:
         "http://backend:8000",
         client=httpx2.Client(transport=httpx2.MockTransport(handler)),
     )
+
+
+def _session() -> PlannedSession:
+    return PlannedSession(date=date(2026, 10, 5), distance_km=10.0, pace_min_per_km=5.0, rpe=6.0)
 
 
 @pytest.mark.parametrize(
@@ -91,6 +97,36 @@ def test_metrics_client_raises_on_error_status() -> None:
 
     with pytest.raises(MetricsClientError):
         _client(handler).get_acwr()
+
+
+def test_metrics_client_posts_taper() -> None:
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        assert request.method == "POST"
+        assert request.url.path == "/simulate/taper"
+        return httpx2.Response(
+            200,
+            json={
+                "dates": ["2026-10-05"],
+                "fitness": [1.0],
+                "fatigue": [2.0],
+                "performance": [-1.0],
+                "freshness": [-1.0],
+                "history_end_index": -1,
+            },
+        )
+
+    sessions = [_session()]
+    response = _client(handler).post_taper(sessions)
+
+    assert response.dates == [date(2026, 10, 5)]
+
+
+def test_metrics_client_post_taper_error() -> None:
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(500, text="boom")
+
+    with pytest.raises(MetricsClientError):
+        _client(handler).post_taper([_session()])
 
 
 def test_frontend_app_imports() -> None:

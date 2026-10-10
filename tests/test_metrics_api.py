@@ -193,3 +193,108 @@ def test_simulate_accepts_parameter_overrides(client: TestClient) -> None:
 
 def test_simulate_rejects_empty_loads(client: TestClient) -> None:
     assert client.post("/simulate", json={"daily_loads": []}).status_code == 422
+
+
+_DECOUPLING_START = datetime(2026, 10, 5, 7, 0, 0)
+
+
+def _long_run_session() -> ParsedSession:
+    samples: list[Sample] = []
+    elapsed = 0.0
+    for km, speed in ((0, 3.0), (1, 2.7)):
+        for i in range(10):
+            samples.append(
+                Sample(
+                    timestamp=_DECOUPLING_START + timedelta(seconds=elapsed),
+                    elapsed_s=elapsed,
+                    hr=150,
+                    speed_mps=speed,
+                    distance_m=km * 1000.0 + i * 100.0,
+                    is_valid=True,
+                )
+            )
+            elapsed += 1.0
+    return ParsedSession(
+        metadata=SessionMetadata(
+            sport="running",
+            sub_sport="street",
+            start_time=_DECOUPLING_START,
+            duration_s=elapsed,
+        ),
+        samples=samples,
+    )
+
+
+def test_decoupling_returns_per_km_efficiency(tmp_path: Path) -> None:
+    store = SessionStore(tmp_path / "decoupling.duckdb")
+    store.save_session("longrun", _long_run_session(), "data/raw/longrun.fit")
+    client = _client_for(store)
+    try:
+        response = client.get("/metrics/decoupling/longrun")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["efficiency_per_km"] == pytest.approx([0.02, 0.018])
+    assert body["decoupling_pct"] == pytest.approx(10.0)
+
+
+def test_decoupling_without_distance_is_empty(client: TestClient) -> None:
+    body = client.get("/metrics/decoupling/run1").json()
+
+    assert body["efficiency_per_km"] == []
+    assert body["decoupling_pct"] is None
+
+
+def test_decoupling_unknown_exercise_is_404(client: TestClient) -> None:
+    assert client.get("/metrics/decoupling/missing").status_code == 404
+
+
+def test_taper_merges_history_and_planned_sessions(client: TestClient) -> None:
+    sessions = [
+        {"date": "2026-10-05", "distance_km": 10.0, "pace_min_per_km": 5.0, "rpe": 6.0},
+        {"date": "2026-10-07", "distance_km": 5.0, "pace_min_per_km": 6.0, "rpe": 4.0},
+    ]
+    response = client.post("/simulate/taper", json={"sessions": sessions})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["dates"] == [
+        "2026-10-03",
+        "2026-10-04",
+        "2026-10-05",
+        "2026-10-06",
+        "2026-10-07",
+    ]
+    assert body["history_end_index"] == 1
+    assert len(body["freshness"]) == 5
+
+
+def test_taper_without_sessions_returns_history(client: TestClient) -> None:
+    body = client.post("/simulate/taper", json={"sessions": []}).json()
+
+    assert body["dates"] == ["2026-10-03", "2026-10-04"]
+    assert body["history_end_index"] == 1
+
+
+def test_taper_without_history_marks_no_boundary(tmp_path: Path) -> None:
+    client = _client_for(SessionStore(tmp_path / "empty.duckdb"))
+    sessions = [
+        {"date": "2026-10-05", "distance_km": 10.0, "pace_min_per_km": 5.0, "rpe": 6.0},
+    ]
+    try:
+        response = client.post("/simulate/taper", json={"sessions": sessions})
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.json()["dates"] == ["2026-10-05"]
+    assert response.json()["history_end_index"] == -1
+
+
+def test_taper_rejects_invalid_session(client: TestClient) -> None:
+    sessions = [
+        {"date": "2026-10-05", "distance_km": 0.0, "pace_min_per_km": 5.0, "rpe": 6.0},
+    ]
+
+    assert client.post("/simulate/taper", json={"sessions": sessions}).status_code == 422

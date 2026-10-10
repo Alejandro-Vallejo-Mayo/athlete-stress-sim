@@ -1,10 +1,11 @@
-"""REST endpoints exposing the training-load metrics and the simulator (S10).
+"""REST endpoints exposing the training-load metrics and the simulator (S10, S13).
 
 Metrics are computed on demand from the persisted DuckDB sessions: the Banister
 TRIMP for endurance sessions and the session-RPE load for strength sessions feed
 the ACWR (``RF-04``) and the fitness-fatigue model (``RF-03``). ``POST /simulate``
-runs the Banister model forward over a caller-provided daily-load series; the
-tapering projections of ``RF-05.2`` build on top of it in S13.
+runs the Banister model forward over a caller-provided daily-load series, while
+``POST /simulate/taper`` merges planned sessions with the history (``RF-05.2``)
+and ``GET /metrics/decoupling/{id}`` reports the aerobic decoupling (``RF-05.3``).
 """
 
 from __future__ import annotations
@@ -20,9 +21,12 @@ from athlete_stress_sim.backend.schemas.metrics import (
     AcwrPoint,
     AcwrResponse,
     BanisterSeriesResponse,
+    DecouplingResponse,
     SessionLoadResponse,
     SimulationRequest,
     SimulationResponse,
+    TaperSimulationRequest,
+    TaperSimulationResponse,
 )
 from athlete_stress_sim.core.etl.sports import is_strength
 from athlete_stress_sim.core.etl.types import Exercise
@@ -34,7 +38,12 @@ from athlete_stress_sim.core.metrics.acwr import (
     ewma_lambda,
     ewma_series,
 )
-from athlete_stress_sim.core.metrics.load import daily_load_series, session_load
+from athlete_stress_sim.core.metrics.decoupling import aerobic_decoupling, per_km_efficiency
+from athlete_stress_sim.core.metrics.load import (
+    daily_load_series,
+    planned_session_load,
+    session_load,
+)
 from athlete_stress_sim.core.models.banister import BanisterParams, impulse_response
 from athlete_stress_sim.core.storage.session_store import SessionStore
 
@@ -129,6 +138,20 @@ def get_banister(store: SessionStoreDep) -> BanisterSeriesResponse:
     )
 
 
+@router.get("/decoupling/{exercise_id}")
+def get_decoupling(exercise_id: str, store: SessionStoreDep) -> DecouplingResponse:
+    """Return the per-kilometre efficiency factors and aerobic decoupling."""
+    exercise = store.get_exercise(exercise_id)
+    if exercise is None:
+        raise HTTPException(status_code=404, detail=f"Unknown exercise {exercise_id!r}.")
+    samples = store.query_samples(exercise_id)
+    return DecouplingResponse(
+        exercise_id=exercise_id,
+        efficiency_per_km=per_km_efficiency(samples),
+        decoupling_pct=aerobic_decoupling(samples),
+    )
+
+
 @simulate_router.post("/simulate")
 def simulate(payload: SimulationRequest) -> SimulationResponse:
     """Run the Banister model forward over the requested daily loads."""
@@ -138,4 +161,36 @@ def simulate(payload: SimulationRequest) -> SimulationResponse:
         fatigue=result.fatigue,
         performance=result.performance,
         freshness=result.freshness,
+    )
+
+
+@simulate_router.post("/simulate/taper")
+def simulate_taper(
+    payload: TaperSimulationRequest,
+    store: SessionStoreDep,
+) -> TaperSimulationResponse:
+    """Project the fitness-fatigue model over planned sessions plus history."""
+    history = _assemble_daily_loads(store)
+    history_dates = {day for day, _ in history}
+    planned = [
+        (
+            session.date,
+            planned_session_load(session.distance_km, session.pace_min_per_km, session.rpe),
+        )
+        for session in payload.sessions
+    ]
+    dates, values = daily_load_series([*history, *planned])
+    result = impulse_response(values, payload.params or _physiology_params())
+    history_end_index = -1
+    if history_dates:
+        last_history = max(history_dates)
+        if last_history in dates:
+            history_end_index = dates.index(last_history)
+    return TaperSimulationResponse(
+        dates=dates,
+        fitness=result.fitness,
+        fatigue=result.fatigue,
+        performance=result.performance,
+        freshness=result.freshness,
+        history_end_index=history_end_index,
     )

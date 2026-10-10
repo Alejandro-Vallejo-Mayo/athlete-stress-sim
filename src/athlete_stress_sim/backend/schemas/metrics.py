@@ -68,3 +68,48 @@ class SimulationResponse(BaseModel):
     fatigue: list[float] = Field(default_factory=list)
     performance: list[float] = Field(default_factory=list)
     freshness: list[float] = Field(default_factory=list)
+
+
+class DecouplingResponse(BaseModel):
+    """Aerobic decoupling of a running session (``RF-05.3``)."""
+
+    exercise_id: str
+    efficiency_per_km: list[float] = Field(
+        default_factory=list, description="Efficiency factor (speed/HR) per kilometre."
+    )
+    decoupling_pct: float | None = Field(
+        default=None, description="Relative EF drop from the first to the second half."
+    )
+
+
+class PlannedSession(BaseModel):
+    """A projected future running session (``RF-05.2``)."""
+
+    date: date
+    distance_km: float = Field(gt=0.0, description="Planned distance in kilometres.")
+    pace_min_per_km: float = Field(gt=0.0, description="Planned pace in minutes per kilometre.")
+    rpe: float = Field(ge=0.0, le=10.0, description="Planned Borg CR-10 session RPE.")
+
+
+class TaperSimulationRequest(BaseModel):
+    """Planned sessions to project on top of the persisted history (``RF-05.2``)."""
+
+    sessions: list[PlannedSession] = Field(default_factory=list)
+    params: BanisterParams | None = Field(
+        default=None,
+        description="Override the physiological priors; defaults to ``/config/physiology``.",
+    )
+
+
+class TaperSimulationResponse(BaseModel):
+    """Dated fitness-fatigue trajectory with a marked history/forecast boundary."""
+
+    dates: list[date] = Field(default_factory=list)
+    fitness: list[float] = Field(default_factory=list)
+    fatigue: list[float] = Field(default_factory=list)
+    performance: list[float] = Field(default_factory=list)
+    freshness: list[float] = Field(default_factory=list)
+    history_end_index: int = Field(
+        default=-1,
+        description="Index of the last real (history) day, or -1 when there is no history.",
+    )

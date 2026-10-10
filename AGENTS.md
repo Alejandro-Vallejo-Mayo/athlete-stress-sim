@@ -40,7 +40,8 @@ Python 3.12.
 - `core/etl/` — Polar OAuth2 client, catch-up sync, FIT parser, normalization.
 - `core/storage/` — DuckDB stores: `session_store` (tables `athlete`, `exercises`, `samples`,
   `session_rpe`), `ingest_store` (ingest log/queue), `token_store`.
-- `core/metrics/` — `trimp`, `rpe`, `acwr`, `load`; `core/models/` — `banister` (ODE), `ekf`.
+- `core/metrics/` — `trimp`, `rpe`, `acwr`, `load`, `decoupling`; `core/models/` — `banister`
+  (ODE), `ekf`.
 - `frontend/` — Dash + Mantine dashboard (dark theme); `api.py` fetches the backend over HTTP
   (`API_URL`, default `http://localhost:8000`), panels live in `components/`.
 - Config uses pydantic-settings with env prefixes `ATHLETE_` / `POLAR_`; `.env` is git-ignored
@@ -54,7 +55,7 @@ Python 3.12.
   the network. Keep that when adding tests that import the app.
 - FIT fixtures are synthesized in memory by `tests/helpers/fit_fixture.py`; never commit real
   biometric data (`RNF-01`).
-- Trace work to `ROADMAP.md` sprints/DoD. Status: S1–S12 complete; S13–S16 (tapering simulator
-  + aerobic decoupling, real-data validation, Docker/CI polish, public README) pending.
+- Trace work to `ROADMAP.md` sprints/DoD. Status: S1–S13 (Phases 0–2) complete; S14–S16
+  (real-data validation, Docker/CI polish, public README) pending.
 - Conventional commits (`feat:`, `refactor:`, ...). CI triggers on `main`/`develop`/`feature/**`
   and on PRs to `main`/`develop`.

@@ -13,7 +13,13 @@ from contextlib import contextmanager
 
 import httpx2
 
-from athlete_stress_sim.backend.schemas.metrics import AcwrResponse, BanisterSeriesResponse
+from athlete_stress_sim.backend.schemas.metrics import (
+    AcwrResponse,
+    BanisterSeriesResponse,
+    PlannedSession,
+    TaperSimulationRequest,
+    TaperSimulationResponse,
+)
 
 DEFAULT_API_URL = "http://localhost:8000"
 _HTTP_BAD_REQUEST = 400
@@ -45,6 +51,12 @@ class MetricsClient:
         """Fetch the daily acute:chronic workload ratio series from the backend."""
         return AcwrResponse.model_validate(self._get("/metrics/acwr"))
 
+    def post_taper(self, sessions: list[PlannedSession]) -> TaperSimulationResponse:
+        """Project the fitness-fatigue model over the given planned sessions."""
+        request = TaperSimulationRequest(sessions=sessions)
+        payload = request.model_dump(mode="json")
+        return TaperSimulationResponse.model_validate(self._post("/simulate/taper", payload))
+
     @contextmanager
     def _connection(self) -> Iterator[httpx2.Client]:
         if self._client is not None:
@@ -58,6 +70,20 @@ class MetricsClient:
         with self._connection() as client:
             try:
                 response = client.get(url)
+            except httpx2.TransportError as exc:
+                raise MetricsClientError(f"Metrics API unreachable at {url}: {exc}") from exc
+        if response.status_code >= _HTTP_BAD_REQUEST:
+            raise MetricsClientError(
+                f"Metrics API returned {response.status_code} for {url}: {response.text}"
+            )
+        payload: object = response.json()
+        return payload
+
+    def _post(self, path: str, body: object) -> object:
+        url = f"{self._base_url}{path}"
+        with self._connection() as client:
+            try:
+                response = client.post(url, json=body)
             except httpx2.TransportError as exc:
                 raise MetricsClientError(f"Metrics API unreachable at {url}: {exc}") from exc
         if response.status_code >= _HTTP_BAD_REQUEST:
