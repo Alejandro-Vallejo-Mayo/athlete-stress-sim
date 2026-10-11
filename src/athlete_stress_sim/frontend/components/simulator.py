@@ -73,6 +73,7 @@ def build_taper_figure(response: TaperSimulationResponse) -> go.Figure:
         history = slice(0, split + 1)
         forecast = slice(split, None)
 
+    labels = [f"{day:%b} {day.day}" for day in response.dates]
     series = [
         ("Fitness", response.fitness, _FITNESS_COLOR),
         ("Fatigue", response.fatigue, _FATIGUE_COLOR),
@@ -82,7 +83,7 @@ def build_taper_figure(response: TaperSimulationResponse) -> go.Figure:
     for name, values, color in series:
         figure.add_trace(
             go.Scatter(
-                x=response.dates[history],
+                x=labels[history],
                 y=values[history],
                 name=name,
                 line={"color": color},
@@ -91,7 +92,7 @@ def build_taper_figure(response: TaperSimulationResponse) -> go.Figure:
         )
         figure.add_trace(
             go.Scatter(
-                x=response.dates[forecast],
+                x=labels[forecast],
                 y=values[forecast],
                 name=f"{name} (forecast)",
                 line={"color": color, "dash": "dash"},
@@ -100,8 +101,8 @@ def build_taper_figure(response: TaperSimulationResponse) -> go.Figure:
             )
         )
 
-    if 0 <= split < len(response.dates) - 1:
-        figure.add_vline(x=response.dates[split], line_dash="dot", line_color="#868e96")
+    if 0 <= split < len(labels) - 1:
+        figure.add_vline(x=labels[split], line_dash="dot", line_color="#868e96")
     return _style(figure, "Taper forecast")
 
 
@@ -172,8 +173,14 @@ def _style(figure: go.Figure, title: str) -> go.Figure:
     figure.update_layout(
         template="plotly_dark",
         title=title,
-        margin={"l": 40, "r": 20, "t": 50, "b": 40},
-        legend={"orientation": "h", "y": -0.2},
+        margin={"l": 50, "r": 20, "t": 70, "b": 50},
+        legend={
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": 1.0,
+            "xanchor": "right",
+            "x": 1.0,
+        },
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
     )

@@ -105,12 +105,21 @@ def create_app(client: MetricsClient | None = None) -> dash.Dash:
                     ),
                     dmc.SimpleGrid(
                         [
-                            html.Div(status_panel(None, None), id="status-panel"),
-                            dcc.Graph(id="fitness-chart", figure=initial_fitness),
-                            dcc.Graph(id="acwr-gauge", figure=initial_gauge),
+                            html.Div(
+                                status_panel(None, None),
+                                id="status-panel",
+                                style={"height": "100%"},
+                            ),
+                            dcc.Graph(
+                                id="acwr-gauge", figure=initial_gauge, style={"height": "320px"}
+                            ),
                         ],
                         cols={"base": 1, "md": 2},
                         spacing="md",
+                        style={"alignItems": "stretch"},
+                    ),
+                    dcc.Graph(
+                        id="fitness-chart", figure=initial_fitness, style={"height": "420px"}
                     ),
                     decoupling_panel(),
                     simulator_panel(),

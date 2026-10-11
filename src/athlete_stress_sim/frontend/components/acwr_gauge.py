@@ -15,6 +15,7 @@ UNDERTRAINING_MAX = 0.8
 SWEET_SPOT_MAX = 1.3
 WARNING_MAX = 1.5
 GAUGE_MAX = 2.0
+_GAUGE_THICKNESS = 0.5
 
 _NO_DATA_MESSAGE = "No data yet."
 
@@ -56,16 +57,27 @@ def build_acwr_gauge(points: list[AcwrPoint]) -> go.Figure:
         (SWEET_SPOT_MAX, WARNING_MAX, RiskZone.WARNING),
         (WARNING_MAX, GAUGE_MAX, RiskZone.DANGER),
     ]
-    steps = [{"range": [low, high], "color": ZONE_META[zone].color} for low, high, zone in bands]
+    # Draw the four risk zones as thick bands and hide the value bar: the fill
+    # would otherwise cover the lower zones. The number is tinted with the
+    # current zone colour instead.
+    steps = [
+        {
+            "range": [low, high],
+            "color": ZONE_META[zone].color,
+            "thickness": _GAUGE_THICKNESS,
+            "line": {"width": 0},
+        }
+        for low, high, zone in bands
+    ]
     figure = go.Figure(
         go.Indicator(
             mode="gauge+number",
             value=latest.acwr,
-            number={"valueformat": ".2f"},
+            number={"valueformat": ".2f", "font": {"color": meta.color}},
             title={"text": f"ACWR - {meta.label}"},
             gauge={
                 "axis": {"range": [0.0, GAUGE_MAX]},
-                "bar": {"color": meta.color},
+                "bar": {"color": "rgba(0,0,0,0)"},
                 "steps": steps,
             },
         )

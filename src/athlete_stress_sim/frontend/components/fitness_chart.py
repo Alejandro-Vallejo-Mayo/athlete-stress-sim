@@ -25,16 +25,17 @@ def build_fitness_figure(series: BanisterSeriesResponse) -> go.Figure:
     if not series.dates:
         return _empty_figure()
 
+    labels = [f"{day:%b} {day.day}" for day in series.dates]
     figure = go.Figure()
     figure.add_trace(
-        go.Scatter(x=series.dates, y=series.fitness, name="Fitness", line={"color": _FITNESS_COLOR})
+        go.Scatter(x=labels, y=series.fitness, name="Fitness", line={"color": _FITNESS_COLOR})
     )
     figure.add_trace(
-        go.Scatter(x=series.dates, y=series.fatigue, name="Fatigue", line={"color": _FATIGUE_COLOR})
+        go.Scatter(x=labels, y=series.fatigue, name="Fatigue", line={"color": _FATIGUE_COLOR})
     )
     figure.add_trace(
         go.Scatter(
-            x=series.dates,
+            x=labels,
             y=series.freshness,
             name="Freshness (TSB)",
             line={"color": _FRESHNESS_COLOR},
@@ -55,8 +56,14 @@ def _style(figure: go.Figure) -> go.Figure:
     figure.update_layout(
         template="plotly_dark",
         title="Fitness / Fatigue / Freshness",
-        margin={"l": 40, "r": 20, "t": 50, "b": 40},
-        legend={"orientation": "h", "y": -0.2},
+        margin={"l": 50, "r": 20, "t": 70, "b": 50},
+        legend={
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": 1.0,
+            "xanchor": "right",
+            "x": 1.0,
+        },
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
     )

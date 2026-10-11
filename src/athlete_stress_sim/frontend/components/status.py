@@ -7,6 +7,9 @@ import dash_mantine_components as dmc
 from athlete_stress_sim.frontend.readiness import READINESS_META, Readiness
 
 _NO_DATA_MESSAGE = "No training history yet."
+_NEUTRAL_COLOR = "#495057"
+_ACCENT_WIDTH = "6px"
+_DOT_SIZE = 96
 
 
 def status_panel(readiness: Readiness | None, freshness: float | None) -> dmc.Paper:
@@ -17,39 +20,45 @@ def status_panel(readiness: Readiness | None, freshness: float | None) -> dmc.Pa
         freshness: Current ``fitness - fatigue`` value, or ``None`` when there is no history.
 
     Returns:
-        A Mantine ``Paper`` card showing the traffic light and the freshness metric.
+        A full-height Mantine ``Paper`` card with a large readiness light on the
+        left and the readiness text and freshness metric on the right.
     """
     if readiness is None or freshness is None:
-        return _card(dmc.Text(_NO_DATA_MESSAGE, c="dimmed"))
+        return _card(_NEUTRAL_COLOR, dmc.Text(_NO_DATA_MESSAGE, c="dimmed"))
 
     meta = READINESS_META[readiness]
-    content = dmc.Stack(
-        [
-            dmc.Group(
-                [
-                    dmc.ThemeIcon("●", color=meta.color, variant="filled", radius="xl", size="lg"),
-                    dmc.Stack(
-                        [
-                            dmc.Text(meta.label, fw=600),
-                            dmc.Text(meta.description, c="dimmed", size="sm"),
-                        ],
-                        gap=0,
-                    ),
-                ],
-                gap="md",
-                align="center",
-            ),
-            dmc.Text(f"Freshness: {freshness:+.1f} AU", fw=600, size="xl"),
-        ],
-        gap="md",
+    light = dmc.Box(
+        w=_DOT_SIZE,
+        h=_DOT_SIZE,
+        style={
+            "borderRadius": "50%",
+            "backgroundColor": meta.color,
+            "boxShadow": f"0 0 28px {meta.color}",
+            "flexShrink": 0,
+        },
     )
-    return _card(content)
+    details = dmc.Stack(
+        [
+            dmc.Text(meta.label, fw=700, size="xl"),
+            dmc.Text(meta.description, c="dimmed", size="sm"),
+            dmc.Text(f"Freshness: {freshness:+.1f} AU", fw=700, size="lg"),
+        ],
+        gap=4,
+    )
+    content = dmc.Group([light, details], gap="xl", align="center")
+    return _card(meta.color, content)
 
 
-def _card(content: dmc.Stack | dmc.Text) -> dmc.Paper:
+def _card(accent: str, content: dmc.Group | dmc.Text) -> dmc.Paper:
     return dmc.Paper(
-        dmc.Stack([dmc.Text("Daily status", fw=600, size="lg"), content], gap="md"),
+        dmc.Stack(
+            [dmc.Text("Daily status", fw=600, size="lg"), content],
+            gap="lg",
+            justify="center",
+            h="100%",
+        ),
         p="lg",
         radius="md",
         withBorder=True,
+        style={"height": "100%", "borderLeft": f"{_ACCENT_WIDTH} solid {accent}"},
     )

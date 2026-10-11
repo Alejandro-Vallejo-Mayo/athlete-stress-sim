@@ -19,8 +19,8 @@ def build_decoupling_figure(response: DecouplingResponse) -> go.Figure:
         response: Aerobic decoupling of one running session.
 
     Returns:
-        A bar chart of ``EF = speed / HR`` per kilometre, annotated with the
-        decoupling percentage, or a placeholder when there is no data.
+        A bar chart of ``EF = speed / HR`` per kilometre, or a placeholder when
+        there is no data. The decoupling percentage is shown by the panel text.
     """
     if not response.efficiency_per_km:
         return _empty_figure()
@@ -28,16 +28,6 @@ def build_decoupling_figure(response: DecouplingResponse) -> go.Figure:
     kilometres = list(range(1, len(response.efficiency_per_km) + 1))
     figure = go.Figure(go.Bar(x=kilometres, y=response.efficiency_per_km, marker_color=_EF_COLOR))
     figure.update_layout(xaxis_title="Kilometre", yaxis_title="EF (m/s per bpm)")
-    if response.decoupling_pct is not None:
-        figure.add_annotation(
-            text=decoupling_status_text(response),
-            xref="paper",
-            yref="paper",
-            x=0.0,
-            y=1.15,
-            showarrow=False,
-            font={"size": 13},
-        )
     return _style(figure)
 
 
@@ -67,6 +57,7 @@ def decoupling_panel() -> dmc.Paper:
                 dcc.Graph(
                     id="decoupling-chart",
                     figure=build_decoupling_figure(DecouplingResponse(exercise_id="")),
+                    style={"height": "340px"},
                 ),
             ],
             gap="md",
@@ -89,7 +80,7 @@ def _style(figure: go.Figure) -> go.Figure:
     figure.update_layout(
         template="plotly_dark",
         title="Efficiency factor per kilometre",
-        margin={"l": 40, "r": 20, "t": 60, "b": 40},
+        margin={"l": 50, "r": 20, "t": 60, "b": 50},
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
     )

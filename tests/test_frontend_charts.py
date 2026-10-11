@@ -115,7 +115,7 @@ def test_decoupling_figure_has_one_bar_per_km() -> None:
     assert len(figure.data) == 1
     assert list(figure.data[0].x) == [1, 2]
     assert [float(value) for value in figure.data[0].y] == [0.02, 0.018]
-    assert figure.layout.annotations[0].text == "Decoupling: +10.0% (EF fell in the second half)."
+    assert figure.layout.title.text == "Efficiency factor per kilometre"
 
 
 def test_decoupling_figure_empty_shows_placeholder() -> None:
