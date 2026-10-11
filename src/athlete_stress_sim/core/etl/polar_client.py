@@ -2,15 +2,15 @@
 
 Wraps the user-authenticated endpoints used by the ingestion pipeline:
 listing exercises, fetching a summary and downloading the raw FIT/TCX files.
-All calls go through a retry helper that backs off on HTTP 429 and 5xx errors
-and honours the ``Retry-After`` header.
+All calls go through a retry helper that backs off on HTTP 429/5xx responses,
+honours the ``Retry-After`` header and retries transient transport errors
+(connection/TLS timeouts).
 """
 
 from __future__ import annotations
 
 import time
-from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+from collections.abc import Callable
 from typing import Any
 
 import httpx2
@@ -22,6 +22,7 @@ from athlete_stress_sim.core.etl.polar_oauth import TokenManager
 _HTTP_BAD_REQUEST = 400
 _HTTP_TOO_MANY_REQUESTS = 429
 _HTTP_SERVER_ERROR = 500
+_DEFAULT_TIMEOUT_S = 30.0
 
 
 class PolarAuthError(RuntimeError):
@@ -46,9 +47,10 @@ class PolarClient:
         config: Polar settings (API base URL and credentials).
         token_manager: Provides a valid OAuth2 access token per request.
         client: Optional pre-built ``httpx2.Client`` for tests.
-        max_retries: Maximum number of retries after a retryable response.
+        max_retries: Maximum number of retries after a retryable response/error.
         backoff_base: Base seconds for exponential backoff.
         sleep: Injectable sleep function (tests pass a no-op).
+        timeout: Request timeout in seconds (connection/read) for the HTTP client.
     """
 
     def __init__(
@@ -60,10 +62,11 @@ class PolarClient:
         max_retries: int = 4,
         backoff_base: float = 1.0,
         sleep: Callable[[float], None] = time.sleep,
+        timeout: float = _DEFAULT_TIMEOUT_S,
     ) -> None:
         self._config = config
         self._token_manager = token_manager
-        self._client = client
+        self._client = client if client is not None else httpx2.Client(timeout=timeout)
         self._max_retries = max_retries
         self._backoff_base = backoff_base
         self._sleep = sleep
@@ -100,8 +103,16 @@ class PolarClient:
         headers = self._auth_headers()
         attempt = 0
         while True:
-            with self._client_context() as client:
-                response = client.request(method, url, headers=headers)
+            try:
+                response = self._client.request(method, url, headers=headers)
+            except httpx2.TransportError as exc:
+                if attempt >= self._max_retries:
+                    raise PolarAPIError(
+                        f"Polar request failed after {attempt + 1} attempts: {exc}"
+                    ) from exc
+                self._sleep(self._backoff_base * (2.0**attempt))
+                attempt += 1
+                continue
             if not self._is_retryable(response) or attempt >= self._max_retries:
                 return response
             self._sleep(self._retry_delay(response, attempt))
@@ -124,11 +135,3 @@ class PolarClient:
             raise PolarAPIError(
                 f"Polar failed to {action} ({response.status_code}): {response.text}"
             )
-
-    @contextmanager
-    def _client_context(self) -> Iterator[httpx2.Client]:
-        if self._client is not None:
-            yield self._client
-        else:
-            with httpx2.Client() as client:
-                yield client

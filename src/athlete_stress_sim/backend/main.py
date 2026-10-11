@@ -1,7 +1,7 @@
 """FastAPI backend entry point.
 
-S1 scaffold, the S2 Polar OAuth2 router and the S3 catch-up ingestion sync.
-Metrics endpoints arrive in S10.
+S1 scaffold, the S2 Polar OAuth2 router, the S3 catch-up ingestion sync and the
+S10 metrics/simulation endpoints (TRIMP, ACWR, Banister, ``/simulate``).
 """
 
 from __future__ import annotations
@@ -22,6 +22,8 @@ from athlete_stress_sim.backend.api.ingest import (
     run_ingestion,
 )
 from athlete_stress_sim.backend.api.ingest import router as ingest_router
+from athlete_stress_sim.backend.api.metrics import router as metrics_router
+from athlete_stress_sim.backend.api.metrics import simulate_router
 from athlete_stress_sim.backend.api.oauth import get_token_store
 from athlete_stress_sim.backend.api.oauth import router as oauth_router
 from athlete_stress_sim.backend.config import physiology, polar
@@ -67,6 +69,8 @@ app = FastAPI(
 app.include_router(oauth_router)
 app.include_router(ingest_router)
 app.include_router(exercises_router)
+app.include_router(metrics_router)
+app.include_router(simulate_router)
 
 
 @app.get("/health", tags=["system"])

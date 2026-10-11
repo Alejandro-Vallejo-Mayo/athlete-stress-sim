@@ -13,6 +13,8 @@ from athlete_stress_sim.core.etl.sports import is_strength
 from athlete_stress_sim.core.metrics.rpe import session_rpe_load
 from athlete_stress_sim.core.metrics.trimp import Sex, trimp_from_samples
 
+_SECONDS_PER_MINUTE = 60.0
+
 
 def session_load(
     sport: str,
@@ -51,6 +53,32 @@ def session_load(
     if hr_samples:
         return trimp_from_samples(hr_samples, hr_rest, hr_max, sex)
     return None
+
+
+def planned_session_load(distance_km: float, pace_min_per_km: float, rpe: float) -> float:
+    """Estimate a planned running session's load from distance, pace and RPE.
+
+    The duration is derived as ``distance_km * pace_min_per_km`` and the load
+    uses Foster's session-RPE (``rpe * duration_min``), keeping projected loads
+    on the same arbitrary-unit scale as the recorded TRIMP/sRPE (``RF-05.2``).
+
+    Args:
+        distance_km: Planned distance in kilometres.
+        pace_min_per_km: Planned pace in minutes per kilometre.
+        rpe: Planned session RPE on the Borg CR-10 scale (0-10).
+
+    Returns:
+        The session load in arbitrary units.
+
+    Raises:
+        ValueError: If ``distance_km`` or ``pace_min_per_km`` is not positive.
+    """
+    if distance_km <= 0.0:
+        raise ValueError("distance_km must be positive")
+    if pace_min_per_km <= 0.0:
+        raise ValueError("pace_min_per_km must be positive")
+    duration_s = distance_km * pace_min_per_km * _SECONDS_PER_MINUTE
+    return session_rpe_load(rpe, duration_s)
 
 
 def daily_load_series(

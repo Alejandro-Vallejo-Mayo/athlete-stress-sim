@@ -202,32 +202,32 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 #### Semana 10 — Backend FastAPI
 **Objetivo:** exponer métricas y simulaciones (`RF-05`).
 
-- [ ] Endpoints REST: `/metrics/trimp`, `/metrics/acwr`, `/metrics/banister`, `/simulate`.
-- [ ] Modelos Pydantic (`src/athlete_stress_sim/backend/schemas/`) de request/response.
-- [ ] Integración con DuckDB y el motor fisiológico.
-- [ ] Tests de integración de la API.
+- [x] Endpoints REST: `/metrics/trimp/{exercise_id}`, `/metrics/acwr`, `/metrics/banister`, `/simulate`.
+- [x] Modelos Pydantic (`src/athlete_stress_sim/backend/schemas/metrics.py`) de request/response.
+- [x] Integración con DuckDB y el motor fisiológico.
+- [x] Tests de integración de la API (`tests/test_metrics_api.py`).
 
 #### Semana 11 — Dashboard (skeleton + panel de estado)
 **Objetivo:** estructura visual y panel diario (`RF-05.1`).
 
-- [ ] App `src/athlete_stress_sim/frontend/app.py` con Plotly Dash + Mantine (tema oscuro, `RNF-04`).
-- [ ] Semáforo de *Readiness Score* y métrica de *Freshness*.
-- [ ] Layout responsive y componentes base.
+- [x] App `src/athlete_stress_sim/frontend/app.py` con Plotly Dash + Mantine (tema oscuro, `RNF-04`).
+- [x] Semáforo de *Readiness Score* y métrica de *Freshness* (`frontend/readiness.py`, `frontend/components/status.py`).
+- [x] Layout responsive y componentes base (cliente HTTP `frontend/api.py`, carga inicial + botón Refresh).
 
 #### Semana 12 — Dashboard (Fitness-Fatiga + ACWR)
 **Objetivo:** visualizar la dinámica del modelo.
 
-- [ ] Gráfico de Fitness / Fatiga / Forma (TSB) a lo largo del tiempo.
-- [ ] Tacómetro de riesgo ACWR con matriz de colores.
-- [ ] Panel de estado fisiológico completo y conectado a la API.
+- [x] Gráfico de Fitness / Fatiga / Forma (TSB) a lo largo del tiempo (`frontend/components/fitness_chart.py`).
+- [x] Tacómetro de riesgo ACWR con matriz de colores (`frontend/components/acwr_gauge.py`).
+- [x] Panel de estado fisiológico completo y conectado a la API (`frontend/app.py`).
 
 #### Semana 13 — Simulador de tapering y desacoplamiento
 **Objetivo:** planificación predictiva (`RF-05.2`, `RF-05.3`).
 
-- [ ] Entrada de entrenamientos futuros proyectados (ej. "18 km a 5:15/km el domingo").
-- [ ] Gráfico predictivo de fatiga/forma hasta el día de la Media Maratón.
-- [ ] Métrica de desacoplamiento aeróbico `EF = Ritmo / HR` por kilómetros.
-- [ ] Tests del simulador y de la métrica EF.
+- [x] Entrada de entrenamientos futuros proyectados (ej. "12 km a 5:00/km") vía formulario (`frontend/components/simulator.py`) + `POST /simulate/taper` (sRPE `RPE × duración`).
+- [x] Gráfico predictivo de fatiga/forma hasta el día de la Media Maratón (histórico sólido + pronóstico discontinuo).
+- [x] Métrica de desacoplamiento aeróbico `EF = velocidad / HR` por kilómetros (`core/metrics/decoupling.py` + `GET /metrics/decoupling/{id}`), visible en el dashboard (`frontend/components/decoupling.py`).
+- [x] Tests del simulador y de la métrica EF.
 
 ---
 
@@ -274,9 +274,9 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 - [x] Simulación EDO < 0.5 s.
 
 ### Fase 2 — DoD
-- [ ] API FastAPI sirve métricas y simulaciones.
-- [ ] Dashboard (dark mode) muestra estado fisiológico, Fitness/Fatiga/Forma, ACWR y simulador de tapering.
-- [ ] End-to-end: dashboard ↔ API ↔ DuckDB funcional.
+- [x] API FastAPI sirve métricas y simulaciones.
+- [x] Dashboard (dark mode) muestra estado fisiológico, Fitness/Fatiga/Forma, ACWR, desacoplamiento aeróbico y simulador de tapering.
+- [x] End-to-end: dashboard ↔ API ↔ DuckDB funcional.
 
 ### Fase 3 — DoD
 - [ ] Sistema validado con ≥ 2 semanas de datos reales.

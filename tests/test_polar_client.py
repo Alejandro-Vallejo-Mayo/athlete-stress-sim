@@ -132,6 +132,27 @@ def test_gives_up_after_max_retries(tmp_path: Path) -> None:
         _client(handler, tmp_path, max_retries=2).list_exercises()
 
 
+def test_retries_on_transport_error(tmp_path: Path) -> None:
+    calls = {"n": 0}
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise httpx2.ConnectTimeout("handshake timed out")
+        return httpx2.Response(200, json={"exercises": []})
+
+    assert _client(handler, tmp_path).list_exercises() == []
+    assert calls["n"] == 2
+
+
+def test_transport_error_gives_up_after_retries(tmp_path: Path) -> None:
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        raise httpx2.ConnectTimeout("handshake timed out")
+
+    with pytest.raises(PolarAPIError, match="request failed"):
+        _client(handler, tmp_path, max_retries=2).list_exercises()
+
+
 def test_raises_auth_error_without_tokens(tmp_path: Path) -> None:
     def handler(request: httpx2.Request) -> httpx2.Response:
         raise AssertionError("No HTTP call should be made without a token")

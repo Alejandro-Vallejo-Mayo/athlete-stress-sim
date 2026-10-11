@@ -55,6 +55,13 @@ def test_list_only_gym_exercises(client: TestClient) -> None:
     assert {item["exercise_id"] for item in response.json()} == {"gym1"}
 
 
+def test_list_only_running_exercises(client: TestClient) -> None:
+    response = client.get("/exercises", params={"kind": "run"})
+
+    assert response.status_code == 200
+    assert {item["exercise_id"] for item in response.json()} == {"run1"}
+
+
 def test_get_exercise(client: TestClient) -> None:
     response = client.get("/exercises/run1")
 
