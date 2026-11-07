@@ -4,13 +4,15 @@ Metrics are computed on demand from the persisted DuckDB sessions: the Banister
 TRIMP for endurance sessions and the session-RPE load for strength sessions feed
 the ACWR (``RF-04``) and the fitness-fatigue model (``RF-03``). ``POST /simulate``
 runs the Banister model forward over a caller-provided daily-load series, while
-``POST /simulate/taper`` merges planned sessions with the history (``RF-05.2``)
-and ``GET /metrics/decoupling/{id}`` reports the aerobic decoupling (``RF-05.3``).
+``POST /simulate/taper`` merges planned sessions with the history (``RF-05.2``),
+``POST /simulate/taper/plan`` generates a tapering plan up to race day (``S14``),
+``GET /metrics/running-baseline`` reports the recent weekly running volume and
+``GET /metrics/decoupling/{id}`` reports the aerobic decoupling (``RF-05.3``).
 """
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -22,11 +24,17 @@ from athlete_stress_sim.backend.schemas.metrics import (
     AcwrResponse,
     BanisterSeriesResponse,
     DecouplingResponse,
+    EkfCalibrationResponse,
+    PlannedSession,
+    RunningBaselineResponse,
     SessionLoadResponse,
     SimulationRequest,
     SimulationResponse,
+    TaperPlanRequest,
+    TaperPlanResponse,
     TaperSimulationRequest,
     TaperSimulationResponse,
+    TaperWeekSummary,
 )
 from athlete_stress_sim.core.etl.sports import is_strength
 from athlete_stress_sim.core.etl.types import Exercise
@@ -44,7 +52,16 @@ from athlete_stress_sim.core.metrics.load import (
     planned_session_load,
     session_load,
 )
+from athlete_stress_sim.core.metrics.performance import (
+    performance_observations,
+    session_efficiency,
+)
+from athlete_stress_sim.core.metrics.taper import (
+    build_taper_sessions,
+    running_baseline,
+)
 from athlete_stress_sim.core.models.banister import BanisterParams, impulse_response
+from athlete_stress_sim.core.models.calibration import CalibrationResult, calibrate_banister
 from athlete_stress_sim.core.storage.session_store import SessionStore
 
 router = APIRouter(prefix="/metrics", tags=["metrics"])
@@ -95,6 +112,87 @@ def _assemble_daily_loads(store: SessionStore) -> list[tuple[date, float]]:
     return dated_loads
 
 
+def _assemble_performance(store: SessionStore, dates: list[date]) -> dict[int, float]:
+    """Collect the efficiency factor of every running session keyed by day index."""
+    sessions: list[tuple[date, float | None]] = []
+    for exercise in store.list_exercises():
+        if exercise.start_time is None or is_strength(exercise.sport, exercise.sub_sport):
+            continue
+        efficiency = session_efficiency(store.query_samples(exercise.exercise_id))
+        sessions.append((exercise.start_time.date(), efficiency))
+    return performance_observations(dates, sessions)
+
+
+def _calibration(
+    store: SessionStore,
+    dates: list[date],
+    daily_loads: list[float],
+) -> CalibrationResult:
+    """Calibrate the Banister parameters against the observed performance."""
+    observations = _assemble_performance(store, dates)
+    return calibrate_banister(daily_loads, observations, _physiology_params())
+
+
+def _assemble_running_sessions(
+    store: SessionStore,
+) -> list[tuple[date, float, float | None, float | None]]:
+    """Collect running sessions with distance, duration and RPE for the baseline."""
+    sessions: list[tuple[date, float, float | None, float | None]] = []
+    for exercise in store.list_exercises():
+        if exercise.start_time is None or is_strength(exercise.sport, exercise.sub_sport):
+            continue
+        if exercise.distance_m is None or exercise.distance_m <= 0.0:
+            continue
+        sessions.append(
+            (
+                exercise.start_time.date(),
+                exercise.distance_m / 1000.0,
+                exercise.duration_s,
+                store.get_rpe(exercise.exercise_id),
+            )
+        )
+    return sessions
+
+
+def _taper_response(
+    history: list[tuple[date, float]],
+    planned: list[tuple[date, float]],
+    params: BanisterParams,
+    *,
+    extend_to: date | None = None,
+) -> TaperSimulationResponse:
+    """Run the fitness-fatigue model over history plus planned sessions.
+
+    When ``extend_to`` is later than the last session, the daily series is padded
+    with zero-load days so the projection reaches that date (e.g. race morning).
+    """
+    dates, values = daily_load_series([*history, *planned])
+    if extend_to is not None:
+        if not dates:
+            dates, values = [extend_to], [0.0]
+        else:
+            current = dates[-1] + timedelta(days=1)
+            while current <= extend_to:
+                dates.append(current)
+                values.append(0.0)
+                current += timedelta(days=1)
+    result = impulse_response(values, params)
+    history_dates = {day for day, _ in history}
+    history_end_index = -1
+    if history_dates:
+        last_history = max(history_dates)
+        if last_history in dates:
+            history_end_index = dates.index(last_history)
+    return TaperSimulationResponse(
+        dates=dates,
+        fitness=result.fitness,
+        fatigue=result.fatigue,
+        performance=result.performance,
+        freshness=result.freshness,
+        history_end_index=history_end_index,
+    )
+
+
 @router.get("/trimp/{exercise_id}")
 def get_session_trimp(exercise_id: str, store: SessionStoreDep) -> SessionLoadResponse:
     """Return the internal load of one session, if computable."""
@@ -128,13 +226,49 @@ def get_acwr(store: SessionStoreDep) -> AcwrResponse:
 def get_banister(store: SessionStoreDep) -> BanisterSeriesResponse:
     """Return the fitness-fatigue trajectory for the persisted training history."""
     dates, values = daily_load_series(_assemble_daily_loads(store))
-    result = impulse_response(values, _physiology_params())
+    calibration = _calibration(store, dates, values)
+    result = impulse_response(values, calibration.params)
     return BanisterSeriesResponse(
         dates=dates,
         fitness=result.fitness,
         fatigue=result.fatigue,
         performance=result.performance,
         freshness=result.freshness,
+    )
+
+
+@router.get("/ekf")
+def get_ekf(store: SessionStoreDep) -> EkfCalibrationResponse:
+    """Return the calibrated Banister parameters and their validation."""
+    dates, values = daily_load_series(_assemble_daily_loads(store))
+    calibration = _calibration(store, dates, values)
+    return EkfCalibrationResponse(
+        params=calibration.params,
+        priors=calibration.priors,
+        calibrated=calibration.calibrated,
+        observations=calibration.observations,
+        r_squared=calibration.r_squared,
+        baseline_efficiency=calibration.baseline_efficiency,
+    )
+
+
+@router.get("/running-baseline")
+def get_running_baseline(store: SessionStoreDep) -> RunningBaselineResponse | None:
+    """Return the recent weekly running volume used to seed the taper form."""
+    sessions = _assemble_running_sessions(store)
+    if not sessions:
+        return None
+    reference = max(session[0] for session in sessions) + timedelta(days=1)
+    baseline = running_baseline(sessions, reference_date=reference)
+    if baseline is None:
+        return None
+    return RunningBaselineResponse(
+        weekly_km=baseline.weekly_km,
+        runs_per_week=baseline.runs_per_week,
+        pace_min_per_km=baseline.pace_min_per_km,
+        rpe=baseline.rpe,
+        sessions=baseline.sessions,
+        weeks=baseline.weeks,
     )
 
 
@@ -170,8 +304,6 @@ def simulate_taper(
     store: SessionStoreDep,
 ) -> TaperSimulationResponse:
     """Project the fitness-fatigue model over planned sessions plus history."""
-    history = _assemble_daily_loads(store)
-    history_dates = {day for day, _ in history}
     planned = [
         (
             session.date,
@@ -179,18 +311,75 @@ def simulate_taper(
         )
         for session in payload.sessions
     ]
-    dates, values = daily_load_series([*history, *planned])
-    result = impulse_response(values, payload.params or _physiology_params())
-    history_end_index = -1
-    if history_dates:
-        last_history = max(history_dates)
-        if last_history in dates:
-            history_end_index = dates.index(last_history)
-    return TaperSimulationResponse(
-        dates=dates,
-        fitness=result.fitness,
-        fatigue=result.fatigue,
-        performance=result.performance,
-        freshness=result.freshness,
-        history_end_index=history_end_index,
+    return _taper_response(
+        _assemble_daily_loads(store),
+        planned,
+        payload.params or _physiology_params(),
+    )
+
+
+@simulate_router.post("/simulate/taper/plan")
+def plan_taper(
+    payload: TaperPlanRequest,
+    store: SessionStoreDep,
+) -> TaperPlanResponse:
+    """Generate a progressive taper up to race day and project it over history."""
+    history = _assemble_daily_loads(store)
+    if history and payload.race_date <= max(day for day, _ in history):
+        raise HTTPException(
+            status_code=422,
+            detail="race_date must be after the last recorded session.",
+        )
+    sessions, weeks = build_taper_sessions(
+        race_date=payload.race_date,
+        base_weekly_km=payload.base_weekly_km,
+        pace_min_per_km=payload.pace_min_per_km,
+        runs_per_week=payload.runs_per_week,
+        rpe=payload.rpe,
+        taper_weeks=payload.taper_weeks,
+    )
+    planned = [
+        (
+            session.date,
+            planned_session_load(session.distance_km, session.pace_min_per_km, session.rpe),
+        )
+        for session in sessions
+    ]
+    simulation = _taper_response(
+        history,
+        planned,
+        payload.params or _physiology_params(),
+        extend_to=payload.race_date,
+    )
+    race_index = simulation.dates.index(payload.race_date)
+    window_start = max(0, race_index - payload.taper_weeks * 7)
+    peak_index = max(
+        range(window_start, race_index + 1),
+        key=lambda index: simulation.freshness[index],
+    )
+    return TaperPlanResponse(
+        sessions=[
+            PlannedSession(
+                date=session.date,
+                distance_km=session.distance_km,
+                pace_min_per_km=session.pace_min_per_km,
+                rpe=session.rpe,
+            )
+            for session in sessions
+        ],
+        weeks=[
+            TaperWeekSummary(
+                start=week.start,
+                factor=week.factor,
+                distance_km=week.distance_km,
+                sessions=week.sessions,
+            )
+            for week in weeks
+        ],
+        simulation=simulation,
+        race_date=payload.race_date,
+        race_index=race_index,
+        race_freshness=simulation.freshness[race_index],
+        peak_freshness_date=simulation.dates[peak_index],
+        peak_freshness=simulation.freshness[peak_index],
     )

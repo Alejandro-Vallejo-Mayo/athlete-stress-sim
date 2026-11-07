@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from athlete_stress_sim.backend.api.oauth import get_oauth_client, get_token_store
 from athlete_stress_sim.backend.config import polar, storage
+from athlete_stress_sim.backend.schemas.ingest import SyncResponse
 from athlete_stress_sim.core.etl.parse_service import ParseResult, ParseService
 from athlete_stress_sim.core.etl.polar_client import PolarAPIError, PolarAuthError, PolarClient
 from athlete_stress_sim.core.etl.polar_oauth import TokenManager
@@ -78,14 +79,15 @@ def run_sync(
     parse_service: ParseDep,
     session_store: SessionStoreDep,
     token_store: TokenStoreDep,
-) -> dict[str, object]:
+) -> SyncResponse:
     """Download and parse every Polar exercise not ingested yet."""
     try:
-        return run_ingestion(sync_service, parse_service, session_store, token_store)
+        result = run_ingestion(sync_service, parse_service, session_store, token_store)
     except PolarAuthError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except PolarAPIError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return SyncResponse.model_validate(result)
 
 
 @router.get("/sync/status")

@@ -98,6 +98,22 @@ def test_taper_figure_splits_history_and_forecast() -> None:
     assert len(figure.layout.shapes) == 1
 
 
+def test_taper_figure_marks_race_day() -> None:
+    response = TaperSimulationResponse(
+        dates=[date(2026, 12, 11), date(2026, 12, 12), date(2026, 12, 13)],
+        fitness=[1.0, 2.0, 3.0],
+        fatigue=[1.0, 2.0, 3.0],
+        performance=[0.0, 0.0, 0.0],
+        freshness=[0.0, 0.0, 0.0],
+        history_end_index=1,
+    )
+
+    figure = build_taper_figure(response, race_date=date(2026, 12, 13))
+
+    assert len(figure.layout.shapes) == 2
+    assert figure.layout.annotations[-1].text == "Race day"
+
+
 def test_taper_figure_empty_shows_placeholder() -> None:
     figure = build_taper_figure(TaperSimulationResponse())
 

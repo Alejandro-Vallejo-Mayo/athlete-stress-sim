@@ -14,15 +14,21 @@ from contextlib import contextmanager
 import httpx2
 from pydantic import TypeAdapter
 
-from athlete_stress_sim.backend.schemas.exercises import ExerciseOut
+from athlete_stress_sim.backend.schemas.exercises import ExerciseOut, RpeInput
+from athlete_stress_sim.backend.schemas.ingest import SyncResponse
 from athlete_stress_sim.backend.schemas.metrics import (
     AcwrResponse,
     BanisterSeriesResponse,
     DecouplingResponse,
+    EkfCalibrationResponse,
     PlannedSession,
+    RunningBaselineResponse,
+    TaperPlanRequest,
+    TaperPlanResponse,
     TaperSimulationRequest,
     TaperSimulationResponse,
 )
+from athlete_stress_sim.core.models.banister import BanisterParams
 
 DEFAULT_API_URL = "http://localhost:8000"
 _HTTP_BAD_REQUEST = 400
@@ -59,15 +65,44 @@ class MetricsClient:
         payload = self._get(f"/exercises?kind={kind}")
         return TypeAdapter(list[ExerciseOut]).validate_python(payload)
 
+    def sync(self) -> SyncResponse:
+        """Ask the backend to download and parse new Polar sessions."""
+        return SyncResponse.model_validate(self._post("/sync", {}))
+
+    def set_rpe(self, exercise_id: str, rpe: float) -> ExerciseOut:
+        """Record the session-RPE of one exercise."""
+        payload = RpeInput(rpe=rpe).model_dump(mode="json")
+        return ExerciseOut.model_validate(self._post(f"/exercises/{exercise_id}/rpe", payload))
+
     def get_decoupling(self, exercise_id: str) -> DecouplingResponse:
         """Fetch the per-kilometre efficiency and aerobic decoupling of an exercise."""
         return DecouplingResponse.model_validate(self._get(f"/metrics/decoupling/{exercise_id}"))
 
-    def post_taper(self, sessions: list[PlannedSession]) -> TaperSimulationResponse:
+    def get_ekf(self) -> EkfCalibrationResponse:
+        """Fetch the calibrated Banister parameters and their validation."""
+        return EkfCalibrationResponse.model_validate(self._get("/metrics/ekf"))
+
+    def get_running_baseline(self) -> RunningBaselineResponse | None:
+        """Fetch the recent weekly running volume, or ``None`` without enough data."""
+        payload = self._get("/metrics/running-baseline")
+        if payload is None:
+            return None
+        return RunningBaselineResponse.model_validate(payload)
+
+    def post_taper(
+        self,
+        sessions: list[PlannedSession],
+        params: BanisterParams | None = None,
+    ) -> TaperSimulationResponse:
         """Project the fitness-fatigue model over the given planned sessions."""
-        request = TaperSimulationRequest(sessions=sessions)
+        request = TaperSimulationRequest(sessions=sessions, params=params)
         payload = request.model_dump(mode="json")
         return TaperSimulationResponse.model_validate(self._post("/simulate/taper", payload))
+
+    def post_taper_plan(self, request: TaperPlanRequest) -> TaperPlanResponse:
+        """Generate a pre-race taper plan and its projection to race day."""
+        payload = request.model_dump(mode="json")
+        return TaperPlanResponse.model_validate(self._post("/simulate/taper/plan", payload))
 
     @contextmanager
     def _connection(self) -> Iterator[httpx2.Client]:

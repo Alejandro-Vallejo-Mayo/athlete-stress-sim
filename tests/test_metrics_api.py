@@ -168,7 +168,13 @@ def test_metrics_are_empty_without_history(tmp_path: Path) -> None:
 
 
 def test_simulate_returns_trajectory(client: TestClient) -> None:
-    response = client.post("/simulate", json={"daily_loads": [100.0] + [0.0] * 120})
+    response = client.post(
+        "/simulate",
+        json={
+            "daily_loads": [100.0] + [0.0] * 120,
+            "params": {"p0": 0.0, "k1": 1.0, "k2": 2.0, "tau1": 45.0, "tau2": 15.0},
+        },
+    )
 
     assert response.status_code == 200
     body = response.json()
@@ -298,3 +304,102 @@ def test_taper_rejects_invalid_session(client: TestClient) -> None:
     ]
 
     assert client.post("/simulate/taper", json={"sessions": sessions}).status_code == 422
+
+
+def test_ekf_falls_back_to_priors_without_observations(client: TestClient) -> None:
+    body = client.get("/metrics/ekf").json()
+
+    assert body["calibrated"] is False
+    assert body["observations"] == 0
+    assert body["params"] == body["priors"]
+    assert body["priors"]["k1"] == pytest.approx(physiology.k_1)
+    assert body["priors"]["k2"] == pytest.approx(physiology.k_2)
+
+
+def _timed_run(start: datetime, distance_m: float = 10_000.0) -> ParsedSession:
+    return ParsedSession(
+        metadata=SessionMetadata(
+            sport="running",
+            sub_sport="street",
+            start_time=start,
+            duration_s=3000.0,
+            distance_m=distance_m,
+        ),
+        samples=[],
+    )
+
+
+def test_running_baseline_is_null_without_distance(client: TestClient) -> None:
+    assert client.get("/metrics/running-baseline").json() is None
+
+
+def test_running_baseline_from_history(tmp_path: Path) -> None:
+    store = SessionStore(tmp_path / "baseline.duckdb")
+    for index in range(8):
+        start = datetime(2026, 11, 17, 7, 0, 0) + timedelta(days=3 * index)
+        exercise_id = f"base{index}"
+        store.save_session(exercise_id, _timed_run(start), f"data/raw/{exercise_id}.fit")
+        store.set_rpe(exercise_id, 6.0)
+    client = _client_for(store)
+    try:
+        body = client.get("/metrics/running-baseline").json()
+    finally:
+        app.dependency_overrides.clear()
+
+    assert body["weekly_km"] == pytest.approx(20.0)
+    assert body["runs_per_week"] == 2
+    assert body["pace_min_per_km"] == pytest.approx(5.0)
+    assert body["rpe"] == pytest.approx(6.0)
+    assert body["sessions"] == 8
+    assert body["weeks"] == 4
+
+
+def test_taper_plan_projects_to_race_day(client: TestClient) -> None:
+    body = client.post(
+        "/simulate/taper/plan",
+        json={
+            "race_date": "2026-12-13",
+            "base_weekly_km": 40.0,
+            "pace_min_per_km": 5.5,
+            "runs_per_week": 3,
+            "rpe": 6.0,
+            "taper_weeks": 3,
+        },
+    ).json()
+
+    assert len(body["sessions"]) == 8
+    assert [week["sessions"] for week in body["weeks"]] == [3, 3, 2]
+    distances = [week["distance_km"] for week in body["weeks"]]
+    assert distances[0] > distances[1] > distances[2]
+    assert body["simulation"]["dates"][-1] == "2026-12-13"
+    assert body["simulation"]["dates"][body["race_index"]] == "2026-12-13"
+    assert body["simulation"]["history_end_index"] == 1
+    assert body["race_freshness"] is not None
+    assert body["peak_freshness_date"] is not None
+    assert body["peak_freshness"] is not None
+
+
+def test_taper_plan_rejects_race_in_the_past(client: TestClient) -> None:
+    response = client.post(
+        "/simulate/taper/plan",
+        json={
+            "race_date": "2026-10-03",
+            "base_weekly_km": 40.0,
+            "pace_min_per_km": 5.5,
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_taper_plan_requires_positive_volume(client: TestClient) -> None:
+    response = client.post(
+        "/simulate/taper/plan",
+        json={
+            "race_date": "2026-12-13",
+            "base_weekly_km": 0.0,
+            "pace_min_per_km": 5.5,
+        },
+    )
+
+    assert response.status_code == 422

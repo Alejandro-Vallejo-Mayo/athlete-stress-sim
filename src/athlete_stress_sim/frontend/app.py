@@ -1,13 +1,14 @@
 """Plotly Dash application: physiological dashboard, simulator and decoupling.
 
 Renders the daily readiness panel (S11), the fitness-fatigue time series and the
-ACWR risk gauge (S12), the tapering simulator (S13) and the aerobic-decoupling
-panel (``RF-05.3``), all fetched from the backend metrics API in a dark theme
-(``RNF-04``).
+ACWR risk gauge (S12), the tapering simulator (S13), the race-aware taper planner
+(S14) and the aerobic-decoupling panel (``RF-05.3``), all fetched from the
+backend metrics API in a dark theme (``RNF-04``).
 """
 
 from __future__ import annotations
 
+from datetime import date
 from typing import cast
 
 import dash
@@ -18,6 +19,8 @@ from athlete_stress_sim.backend.schemas.exercises import ExerciseOut
 from athlete_stress_sim.backend.schemas.metrics import (
     BanisterSeriesResponse,
     DecouplingResponse,
+    EkfCalibrationResponse,
+    TaperPlanRequest,
     TaperSimulationResponse,
 )
 from athlete_stress_sim.frontend.api import MetricsClient, MetricsClientError
@@ -28,9 +31,17 @@ from athlete_stress_sim.frontend.components.decoupling import (
     decoupling_status_text,
 )
 from athlete_stress_sim.frontend.components.fitness_chart import build_fitness_figure
+from athlete_stress_sim.frontend.components.rpe import (
+    pending_gym_sessions,
+    rpe_modal,
+    rpe_pending_children,
+    rpe_pending_style,
+    rpe_session_options,
+)
 from athlete_stress_sim.frontend.components.simulator import (
     SessionData,
     build_taper_figure,
+    race_taper_panel,
     sessions_from_store,
     sessions_list,
     simulator_panel,
@@ -40,6 +51,7 @@ from athlete_stress_sim.frontend.readiness import readiness_level
 
 DashboardOutputs = tuple[object, object, object, list[dict[str, str]], str | None]
 SessionOutputs = tuple[object, object, object, object, object, object, object]
+_MAX_RPE = 10.0
 
 
 def _run_option(exercise: ExerciseOut) -> dict[str, str]:
@@ -47,6 +59,13 @@ def _run_option(exercise: ExerciseOut) -> dict[str, str]:
     when = exercise.start_time.date().isoformat() if exercise.start_time else "unknown"
     distance = f"{exercise.distance_m / 1000.0:.1f} km" if exercise.distance_m else "no distance"
     return {"value": exercise.exercise_id, "label": f"{when} · {distance}"}
+
+
+def _model_label(calibration: EkfCalibrationResponse) -> str:
+    """Describe whether the projection uses calibrated parameters or priors."""
+    if calibration.calibrated and calibration.r_squared is not None:
+        return f"calibrated (R²={calibration.r_squared:.2f})"
+    return "priors (calibration not reliable)"
 
 
 def _load_dashboard(client: MetricsClient, current_run: str | None) -> DashboardOutputs:
@@ -99,7 +118,21 @@ def create_app(client: MetricsClient | None = None) -> dash.Dash:
                     dmc.Group(
                         [
                             dmc.Title("Athlete Stress Sim", order=1),
-                            dmc.Button("Refresh", id="refresh-btn", variant="light"),
+                            dmc.Group(
+                                [
+                                    dmc.Button(
+                                        id="rpe-pending-btn",
+                                        variant="light",
+                                        color="orange",
+                                        style={"display": "none"},
+                                        children="RPE pending",
+                                    ),
+                                    dmc.Text(id="sync-status", c="dimmed", size="xs"),
+                                    dmc.Button("Refresh", id="refresh-btn", variant="light"),
+                                ],
+                                gap="sm",
+                                align="center",
+                            ),
                         ],
                         justify="space-between",
                     ),
@@ -123,7 +156,12 @@ def create_app(client: MetricsClient | None = None) -> dash.Dash:
                     ),
                     decoupling_panel(),
                     simulator_panel(),
+                    race_taper_panel(),
+                    rpe_modal(),
                     dcc.Store(id="sim-sessions", data=[]),
+                    dcc.Store(id="data-refreshed", data=0),
+                    dcc.Store(id="rpe-refresh", data=0),
+                    dcc.Store(id="metric-refresh", data=0),
                     dcc.Interval(id="init", interval=1, max_intervals=1),
                 ],
                 gap="md",
@@ -139,20 +177,34 @@ def create_app(client: MetricsClient | None = None) -> dash.Dash:
         Output("acwr-gauge", "figure"),
         Output("decoupling-run", "data"),
         Output("decoupling-run", "value"),
+        Output("data-refreshed", "data"),
+        Output("sync-status", "children"),
         Input("init", "n_intervals"),
         Input("refresh-btn", "n_clicks"),
+        Input("metric-refresh", "data"),
         State("decoupling-run", "value"),
+        State("data-refreshed", "data"),
     )
     def refresh_dashboard(
         _interval: int | None,
         _clicks: int | None,
+        _metrics: int | None,
         current_run: str | None,
-    ) -> DashboardOutputs:
-        """Reload the dashboard on first paint and on manual refresh."""
+        refreshed: int | None,
+    ) -> tuple[object, object, object, list[dict[str, str]], str | None, int, str]:
+        """Sync on manual refresh, then reload the dashboard panels."""
+        sync_text = ""
+        if ctx.triggered_id == "refresh-btn":
+            try:
+                result = metrics_client.sync()
+                sync_text = f"Synced +{result.sync.downloaded} · parsed {result.parse.parsed}"
+            except MetricsClientError:
+                sync_text = "Sync failed."
         try:
-            return _load_dashboard(metrics_client, current_run)
+            dashboard = _load_dashboard(metrics_client, current_run)
         except MetricsClientError:
-            return _empty_dashboard()
+            dashboard = _empty_dashboard()
+        return (*dashboard, int(refreshed or 0) + 1, sync_text)
 
     @app.callback(
         Output("decoupling-chart", "figure"),
@@ -245,16 +297,173 @@ def create_app(client: MetricsClient | None = None) -> dash.Dash:
                 "Add a session first.",
             )
         try:
-            response = metrics_client.post_taper(sessions)
+            calibration = metrics_client.get_ekf()
+            response = metrics_client.post_taper(sessions, calibration.params)
         except MetricsClientError:
             return (
                 cast(object, build_taper_figure(TaperSimulationResponse())),
                 "Backend offline.",
             )
-        status = f"Projected {len(response.dates)} days."
+        status = f"Projected {len(response.dates)} days · model: {_model_label(calibration)}."
         return (cast(object, build_taper_figure(response)), status)
 
+    _register_rpe_callbacks(app, metrics_client)
+    _register_race_taper_callbacks(app, metrics_client)
     return app
+
+
+def _register_rpe_callbacks(app: dash.Dash, client: MetricsClient) -> None:
+    """Register the pending-RPE badge and the modal that records the RPE."""
+
+    @app.callback(
+        Output("rpe-pending-btn", "style"),
+        Output("rpe-pending-btn", "children"),
+        Output("rpe-session-select", "data"),
+        Output("rpe-session-select", "value"),
+        Input("data-refreshed", "data"),
+        Input("rpe-refresh", "data"),
+    )
+    def load_pending_rpe(
+        _refreshed: int | None,
+        _saved: int | None,
+    ) -> tuple[dict[str, str], object, list[dict[str, str]], str | None]:
+        """Show how many gym sessions are still missing an RPE."""
+        try:
+            exercises = client.get_exercises("gym")
+        except MetricsClientError:
+            return (rpe_pending_style(0), "RPE pending", [], None)
+        pending = pending_gym_sessions(exercises)
+        options = rpe_session_options(pending)
+        value = options[0]["value"] if options else None
+        return (
+            rpe_pending_style(len(pending)),
+            rpe_pending_children(len(pending)),
+            options,
+            value,
+        )
+
+    @app.callback(
+        Output("rpe-modal", "opened"),
+        Output("rpe-feedback", "children"),
+        Output("rpe-value", "value"),
+        Output("rpe-refresh", "data"),
+        Output("metric-refresh", "data"),
+        Input("rpe-pending-btn", "n_clicks"),
+        Input("rpe-save", "n_clicks"),
+        Input("rpe-cancel", "n_clicks"),
+        Input("rpe-apply", "n_clicks"),
+        State("rpe-session-select", "value"),
+        State("rpe-value", "value"),
+        State("rpe-refresh", "data"),
+        State("metric-refresh", "data"),
+        prevent_initial_call=True,
+    )
+    def handle_rpe(  # noqa: PLR0911, PLR0917
+        _open: int | None,
+        _save: int | None,
+        _cancel: int | None,
+        _apply: int | None,
+        exercise_id: str | None,
+        rpe: float | None,
+        counter: int | None,
+        metrics: int | None,
+    ) -> tuple[bool, str, float | None, int, int]:
+        """Open/close the modal, save RPEs and apply the recalculation."""
+        current = counter or 0
+        metrics_current = metrics or 0
+        if ctx.triggered_id == "rpe-pending-btn":
+            return (True, "", None, current, metrics_current)
+        if ctx.triggered_id == "rpe-cancel":
+            return (False, "", None, current, metrics_current)
+        if ctx.triggered_id == "rpe-apply":
+            return (False, "", None, current, metrics_current + 1)
+        if exercise_id is None or rpe is None:
+            return (True, "Select a session and enter an RPE.", None, current, metrics_current)
+        if not 0.0 <= float(rpe) <= _MAX_RPE:
+            return (
+                True,
+                "RPE must be between 0 and 10.",
+                None,
+                current,
+                metrics_current,
+            )
+        try:
+            client.set_rpe(exercise_id, float(rpe))
+        except MetricsClientError:
+            return (
+                True,
+                "Could not save the RPE (backend offline).",
+                None,
+                current,
+                metrics_current,
+            )
+        return (True, "RPE saved.", None, current + 1, metrics_current)
+
+
+def _register_race_taper_callbacks(app: dash.Dash, client: MetricsClient) -> None:
+    """Register the race-taper plan-generation callback."""
+
+    @app.callback(
+        Output("race-chart", "figure"),
+        Output("race-plan-status", "children"),
+        Input("race-run", "n_clicks"),
+        State("race-date", "value"),
+        State("race-base-km", "value"),
+        State("race-runs", "value"),
+        State("race-pace", "value"),
+        State("race-rpe", "value"),
+        State("race-weeks", "value"),
+        prevent_initial_call=True,
+    )
+    def run_taper_plan(  # noqa: PLR0917
+        _clicks: int | None,
+        race_date: str | None,
+        base_km: float | None,
+        runs: int | None,
+        pace: float | None,
+        rpe: float | None,
+        weeks: int | None,
+    ) -> tuple[object, str]:
+        """Generate the pre-race taper and project it to race morning."""
+        if (
+            race_date is None
+            or base_km is None
+            or runs is None
+            or pace is None
+            or rpe is None
+            or weeks is None
+        ):
+            return (
+                cast(object, build_taper_figure(TaperSimulationResponse())),
+                "Complete every field before planning.",
+            )
+        try:
+            target = date.fromisoformat(race_date)
+            calibration = client.get_ekf()
+            plan = client.post_taper_plan(
+                TaperPlanRequest(
+                    race_date=target,
+                    base_weekly_km=float(base_km),
+                    pace_min_per_km=float(pace),
+                    runs_per_week=int(runs),
+                    rpe=float(rpe),
+                    taper_weeks=int(weeks),
+                    params=calibration.params,
+                )
+            )
+        except (MetricsClientError, ValueError):
+            return (
+                cast(object, build_taper_figure(TaperSimulationResponse())),
+                "Backend offline or invalid input.",
+            )
+        figure = build_taper_figure(plan.simulation, race_date=plan.race_date)
+        freshness = plan.race_freshness
+        freshness_text = "n/a" if freshness is None else f"{freshness:.1f}"
+        status = (
+            f"{len(plan.sessions)} sessions over {len(plan.weeks)} weeks · "
+            f"race freshness {freshness_text} · model: {_model_label(calibration)}"
+        )
+        return (cast(object, figure), status)
 
 
 app = create_app()

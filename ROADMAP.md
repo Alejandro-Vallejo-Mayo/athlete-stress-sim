@@ -236,9 +236,9 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 #### Semana 14 — Integración en rutina real y validación
 **Objetivo:** poner el sistema a trabajar con datos reales.
 
-- [ ] Sincronizar al menos 2 semanas de datos reales (3 gym + 3 carrera).
-- [ ] Validar parámetros EKF contra observaciones reales.
-- [ ] Ajustar tapering para las semanas previas a la Media Maratón.
+- [x] Sincronizar al menos 2 semanas de datos reales (3 gym + 3 carrera). Verificado: 14 carrera + 11 gym (2026-10-03 → 2026-11-03), 11/11 gym con RPE.
+- [x] Validar parámetros EKF contra observaciones reales. Integrado vía `GET /metrics/ekf` con quality gate; con 13 observaciones reales R²≈-0.01, por lo que el pipeline cae a priors.
+- [x] Ajustar tapering para las semanas previas a la Media Maratón. Implementado `POST /simulate/taper/plan` + panel `Race taper` (factores 0,75/0,55/0,35, baseline de 4 semanas); validado con datos reales, el freshness máximo cae el 2026-12-13.
 - [ ] Corrección de bugs encontrados en uso real.
 
 #### Semana 15 — Optimización, Docker y CI/CD
