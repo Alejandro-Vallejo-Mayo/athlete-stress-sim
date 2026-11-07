@@ -49,7 +49,7 @@ class BanisterSeriesResponse(BaseModel):
     freshness: list[float] = Field(default_factory=list)
 
 
-class EkfCalibrationResponse(BaseModel):
+class CalibrationResponse(BaseModel):
     """Calibrated Banister parameters and their validation (``RF-03.2``)."""
 
     params: BanisterParams = Field(description="Effective parameters (calibrated or prior).")
@@ -57,10 +57,19 @@ class EkfCalibrationResponse(BaseModel):
     calibrated: bool = Field(description="Whether the fit passed the quality gate.")
     observations: int = Field(ge=0, description="Number of observed performance points.")
     r_squared: float | None = Field(
-        default=None, description="Coefficient of determination of the fit, if computable."
+        default=None, description="In-sample coefficient of determination of the fit."
     )
     baseline_efficiency: float | None = Field(
         default=None, description="Median efficiency factor used to normalise observations."
+    )
+    cv_rmse: float | None = Field(
+        default=None, description="Leave-one-out RMSE of the calibrated model."
+    )
+    prior_cv_rmse: float | None = Field(
+        default=None, description="Leave-one-out RMSE of the prior-shaped baseline."
+    )
+    cv_improvement: float | None = Field(
+        default=None, description="Relative RMSE improvement over the prior baseline."
     )
 
 

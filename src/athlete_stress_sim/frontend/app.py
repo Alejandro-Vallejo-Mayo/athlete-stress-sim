@@ -18,8 +18,8 @@ from dash import Input, Output, State, ctx, dcc, html
 from athlete_stress_sim.backend.schemas.exercises import ExerciseOut
 from athlete_stress_sim.backend.schemas.metrics import (
     BanisterSeriesResponse,
+    CalibrationResponse,
     DecouplingResponse,
-    EkfCalibrationResponse,
     TaperPlanRequest,
     TaperSimulationResponse,
 )
@@ -47,7 +47,7 @@ from athlete_stress_sim.frontend.components.simulator import (
     simulator_panel,
 )
 from athlete_stress_sim.frontend.components.status import status_panel
-from athlete_stress_sim.frontend.readiness import readiness_level
+from athlete_stress_sim.frontend.readiness import assess_readiness
 
 DashboardOutputs = tuple[object, object, object, list[dict[str, str]], str | None]
 SessionOutputs = tuple[object, object, object, object, object, object, object]
@@ -61,10 +61,13 @@ def _run_option(exercise: ExerciseOut) -> dict[str, str]:
     return {"value": exercise.exercise_id, "label": f"{when} · {distance}"}
 
 
-def _model_label(calibration: EkfCalibrationResponse) -> str:
+def _model_label(calibration: CalibrationResponse) -> str:
     """Describe whether the projection uses calibrated parameters or priors."""
-    if calibration.calibrated and calibration.r_squared is not None:
-        return f"calibrated (R²={calibration.r_squared:.2f})"
+    if calibration.calibrated:
+        if calibration.cv_improvement is not None:
+            return f"calibrated (CV +{calibration.cv_improvement:.0%})"
+        if calibration.r_squared is not None:
+            return f"calibrated (R²={calibration.r_squared:.2f})"
     return "priors (calibration not reliable)"
 
 
@@ -75,7 +78,8 @@ def _load_dashboard(client: MetricsClient, current_run: str | None) -> Dashboard
     options = [_run_option(exercise) for exercise in client.get_exercises("run")]
     if series.freshness:
         freshness = series.freshness[-1]
-        panel = status_panel(readiness_level(freshness), freshness)
+        readiness, percentile = assess_readiness(freshness, series.freshness)
+        panel = status_panel(readiness, freshness, percentile)
     else:
         panel = status_panel(None, None)
     valid = {option["value"] for option in options}
@@ -297,7 +301,7 @@ def create_app(client: MetricsClient | None = None) -> dash.Dash:
                 "Add a session first.",
             )
         try:
-            calibration = metrics_client.get_ekf()
+            calibration = metrics_client.get_calibration()
             response = metrics_client.post_taper(sessions, calibration.params)
         except MetricsClientError:
             return (
@@ -439,7 +443,7 @@ def _register_race_taper_callbacks(app: dash.Dash, client: MetricsClient) -> Non
             )
         try:
             target = date.fromisoformat(race_date)
-            calibration = client.get_ekf()
+            calibration = client.get_calibration()
             plan = client.post_taper_plan(
                 TaperPlanRequest(
                     race_date=target,

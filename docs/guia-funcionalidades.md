@@ -83,14 +83,20 @@ localizarlos en pantalla.
 
 ## 4. Panel de estado diario (`Daily status`)
 
-Muestra un semáforo calculado únicamente a partir del **freshness** del último día:
+Muestra un semáforo calculado a partir del **freshness** del último día, pero **relativo a tu
+propio historial reciente** (últimos 90 días). Así el color no depende de la escala arbitraria de
+las ganancias ni de si la calibración está activa:
 
-| Color | Nivel | Freshness (`F`) | Lectura práctica |
+| Color | Nivel | Percentil del freshness actual | Lectura práctica |
 | --- | --- | --- | --- |
-| Verde | **Ready** | `F >= 0` | La aptitud supera a la fatiga; buen momento para una sesión de calidad. |
-| Amarillo | **Caution** | `-5 <= F < 0` | Fatiga acumulada moderada; conviene controlar la intensidad. |
-| Rojo | **Rest** | `F < -5` | Fatiga alta; prioriza recuperación. |
+| Verde | **Ready** | `>= P50` | Está en la mitad alta de tu rango reciente; buen momento para calidad. |
+| Amarillo | **Caution** | `P15 – P50` | Por debajo de tu mediana reciente; controla la intensidad. |
+| Rojo | **Rest** | `< P15` | En la parte más baja de tu rango reciente; prioriza recuperación. |
 | Gris | Sin datos | — | Todavía no hay historial de entrenamiento. |
+
+Con menos de 14 días de historial se usan los umbrales absolutos: `F >= 0` ready,
+`-5 <= F < 0` caution y `F < -5` rest. El panel muestra además
+`Percentile of your recent history: Pxx` para que veas la referencia usada.
 
 El valor `Freshness: +X.X AU` es la diferencia neta del modelo:
 
@@ -176,10 +182,13 @@ La gráfica muestra solo el historial persistido, no el pronóstico. El eje X us
 `mes día` (sin año), y el eje Y está en AU: compara formas y tendencias, no valores absolutos entre
 personas. La API también devuelve `performance`, pero el dashboard no la dibuja.
 
-> El dashboard calibra los parámetros con el EKF a partir del rendimiento observado (EF por
-> carrera). Si hay pocas observaciones o el ajuste no explica suficiente varianza (R² bajo), se
-> usan los **priors** de configuración como respaldo. Puedes consultar el resultado en
-> `GET /metrics/ekf`.
+> El dashboard calibra las ganancias del modelo a partir del rendimiento observado (EF por
+> carrera). Para evitar la mala identificabilidad del modelo, los tiempos `tau1`/`tau2` quedan
+> **fijos en los priors** y solo se estiman `p0`, `k1` y `k2` con mínimos cuadrados acotados y una
+> penalización ridge hacia la forma del prior. El ajuste se acepta solo si, además de explicar
+> varianza in-sample, mejora el RMSE en validación cruzada temporal frente al baseline con forma de
+> prior. Si no, se usan los **priors** de configuración como respaldo. Puedes consultar el
+> resultado en `GET /metrics/calibration` (el antiguo `/metrics/ekf` sigue disponible como alias).
 
 ## 7. Panel de desacoplamiento aeróbico (`Aerobic decoupling`)
 
@@ -297,7 +306,8 @@ La API expone las mismas métricas que consume el dashboard. La documentación i
 | `GET` | `/metrics/trimp/{id}` | Carga interna de una sesión. |
 | `GET` | `/metrics/acwr` | Serie diaria de ACWR y zonas. |
 | `GET` | `/metrics/banister` | Serie diaria de fitness, fatiga, performance y freshness. |
-| `GET` | `/metrics/ekf` | Parámetros Banister calibrados por el EKF y su validación (R²). |
+| `GET` | `/metrics/calibration` | Ganancias Banister calibradas (NLS con `tau` fijo) y su validación (R² y CV). |
+| `GET` | `/metrics/ekf` | Alias obsoleto de `/metrics/calibration`. |
 | `GET` | `/metrics/running-baseline` | Volumen, ritmo y RPE medios de las últimas 4 semanas. |
 | `GET` | `/metrics/decoupling/{id}` | EF por kilómetro y desacoplamiento de una carrera. |
 | `POST` | `/simulate` | Simular una serie de cargas diarias arbitraria. |
@@ -312,9 +322,10 @@ La API expone las mismas métricas que consume el dashboard. La documentación i
 - **El historial de Polar es limitado**. El cliente consulta el listado de ejercicios de los
   últimos 30 días; lo ya descargado permanece en DuckDB. La primera sincronización no reconstruye
   meses de pasado.
-- **La calibración del EKF depende de la cantidad de datos**. Con pocas semanas el rendimiento
-  observado (EF) apenas varía y el ajuste puede no superar el umbral de calidad (R²), en cuyo caso
-  el dashboard usa los priors. Consulta `/metrics/ekf` para ver si la calibración está activa.
+- **La calibración depende de la cantidad y la calidad de los datos**. Con pocas semanas el
+  rendimiento observado (EF) apenas varía y el ajuste puede no superar los umbrales de R² y de
+  mejora en validación cruzada, en cuyo caso el dashboard usa los priors. Consulta
+  `/metrics/calibration` para ver si la calibración está activa y cuánto mejora.
 - **El plan de taper solo modela carrera** y asume que el entrenamiento entre hoy y el inicio de la
   descarga sigue el historial; no reduce automáticamente las sesiones de gimnasio.
 - **La carga combinada es una simplificación**: TRIMP de carrera y sRPE de fuerza se suman en AU

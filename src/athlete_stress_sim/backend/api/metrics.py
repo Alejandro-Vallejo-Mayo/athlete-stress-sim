@@ -23,8 +23,8 @@ from athlete_stress_sim.backend.schemas.metrics import (
     AcwrPoint,
     AcwrResponse,
     BanisterSeriesResponse,
+    CalibrationResponse,
     DecouplingResponse,
-    EkfCalibrationResponse,
     PlannedSession,
     RunningBaselineResponse,
     SessionLoadResponse,
@@ -237,18 +237,22 @@ def get_banister(store: SessionStoreDep) -> BanisterSeriesResponse:
     )
 
 
-@router.get("/ekf")
-def get_ekf(store: SessionStoreDep) -> EkfCalibrationResponse:
+@router.get("/ekf", deprecated=True)
+@router.get("/calibration")
+def get_calibration(store: SessionStoreDep) -> CalibrationResponse:
     """Return the calibrated Banister parameters and their validation."""
     dates, values = daily_load_series(_assemble_daily_loads(store))
     calibration = _calibration(store, dates, values)
-    return EkfCalibrationResponse(
+    return CalibrationResponse(
         params=calibration.params,
         priors=calibration.priors,
         calibrated=calibration.calibrated,
         observations=calibration.observations,
         r_squared=calibration.r_squared,
         baseline_efficiency=calibration.baseline_efficiency,
+        cv_rmse=calibration.cv_rmse,
+        prior_cv_rmse=calibration.prior_cv_rmse,
+        cv_improvement=calibration.cv_improvement,
     )
 
 

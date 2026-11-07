@@ -13,7 +13,12 @@ from athlete_stress_sim.backend.schemas.metrics import PlannedSession, TaperPlan
 from athlete_stress_sim.core.models.banister import BanisterParams
 from athlete_stress_sim.frontend import app as frontend_app
 from athlete_stress_sim.frontend.api import MetricsClient, MetricsClientError
-from athlete_stress_sim.frontend.readiness import Readiness, readiness_level
+from athlete_stress_sim.frontend.readiness import (
+    Readiness,
+    assess_readiness,
+    freshness_percentile,
+    readiness_level,
+)
 
 Handler = Callable[[httpx2.Request], httpx2.Response]
 
@@ -41,6 +46,37 @@ def _session() -> PlannedSession:
 )
 def test_readiness_level_bands(freshness: float, expected: Readiness) -> None:
     assert readiness_level(freshness) is expected
+
+
+def test_freshness_percentile_counts_history_at_or_below() -> None:
+    history = [float(value) for value in range(20)]
+
+    assert freshness_percentile(5.0, history) == pytest.approx(0.3)
+    assert freshness_percentile(100.0, history) == pytest.approx(1.0)
+
+
+def test_assess_readiness_uses_recent_history() -> None:
+    history = [float(value) for value in range(20)]
+
+    ready, ready_percentile = assess_readiness(19.0, history)
+    caution, caution_percentile = assess_readiness(5.0, history)
+    rest, rest_percentile = assess_readiness(1.0, history)
+
+    assert ready is Readiness.READY
+    assert ready_percentile == pytest.approx(1.0)
+    assert caution is Readiness.CAUTION
+    assert caution_percentile == pytest.approx(0.3)
+    assert rest is Readiness.REST
+    assert rest_percentile == pytest.approx(0.1)
+
+
+def test_assess_readiness_falls_back_with_short_history() -> None:
+    readiness, percentile = assess_readiness(10.0, [1.0, 2.0, 3.0])
+    rest, _ = assess_readiness(-10.0, [1.0, 2.0, 3.0])
+
+    assert readiness is Readiness.READY
+    assert percentile is None
+    assert rest is Readiness.REST
 
 
 def test_metrics_client_parses_banister() -> None:
@@ -129,9 +165,9 @@ def test_metrics_client_gets_decoupling() -> None:
     assert response.decoupling_pct == pytest.approx(10.0)
 
 
-def test_metrics_client_gets_ekf() -> None:
+def test_metrics_client_gets_calibration() -> None:
     def handler(request: httpx2.Request) -> httpx2.Response:
-        assert request.url.path == "/metrics/ekf"
+        assert request.url.path == "/metrics/calibration"
         return httpx2.Response(
             200,
             json={
@@ -141,13 +177,17 @@ def test_metrics_client_gets_ekf() -> None:
                 "observations": 12,
                 "r_squared": 0.6,
                 "baseline_efficiency": 0.02,
+                "cv_rmse": 0.001,
+                "prior_cv_rmse": 0.002,
+                "cv_improvement": 0.5,
             },
         )
 
-    response = _client(handler).get_ekf()
+    response = _client(handler).get_calibration()
 
     assert response.calibrated is True
     assert response.params.k1 == pytest.approx(1.5)
+    assert response.cv_improvement == pytest.approx(0.5)
 
 
 def test_metrics_client_syncs() -> None:

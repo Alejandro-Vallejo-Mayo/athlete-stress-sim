@@ -1,17 +1,17 @@
-"""Calibration of the Banister parameters from observed performance (``RF-03.2``).
+"""Calibration of the Banister gains with fixed time constants (``RF-03.2``).
 
-The extended Kalman filter tunes ``k1``, ``k2``, ``tau1`` and ``tau2`` from the
-observed running performance (efficiency factor, see
-:mod:`athlete_stress_sim.core.metrics.performance`). Observations are normalised
-by their median so the fit is scale-free, and the filter is iterated over the
-whole history so the static parameters converge on short series.
+The fitness-fatigue model is ill-conditioned when ``k1/k2`` and ``tau1/tau2`` are
+estimated jointly from a single noisy performance series. Following the
+literature (Vermeire et al., 2022; Marchal et al., 2025), this module keeps the
+time constants fixed at the physiological priors and estimates only the baseline
+and the two gains with a bounded, ridge-regularised linear least-squares fit.
 
-The fitted gains are rescaled to the prior's freshness amplitude before being
-applied: the dashboard expresses freshness (TSB) in load units (``RF-05.1``), so
-raw gains fitted to a dimensionless index would otherwise collapse the readiness
-signal. When the fit does not explain enough variance (or there is too little
-data) the prior is returned unchanged, which is the expected behaviour while the
-history is still short.
+Observations are the session efficiency factor (``speed / HR``), normalised by
+their median so the fit is scale-free. The fitted gains are then rescaled to the
+prior's freshness amplitude so the dashboard keeps expressing freshness (TSB) in
+load units (``RF-05.1``). A model is accepted only when it explains enough
+in-sample variance *and* beats the prior-shaped baseline in leave-one-out
+cross-validation; otherwise the prior is returned unchanged.
 """
 
 from __future__ import annotations
@@ -20,97 +20,129 @@ import math
 import statistics
 from collections.abc import Mapping, Sequence
 
+import numpy as np
 from pydantic import BaseModel, Field
+from scipy.optimize import lsq_linear
 
 from athlete_stress_sim.core.models.banister import BanisterParams, impulse_response
-from athlete_stress_sim.core.models.ekf import BanisterEKF
 
-MIN_OBSERVATIONS = 4
+MIN_OBSERVATIONS = 8
 """Minimum number of observed performances required to attempt a fit."""
 
 MIN_R_SQUARED = 0.1
-"""Minimum coefficient of determination for accepting calibrated parameters."""
+"""Minimum in-sample coefficient of determination for accepting the fit."""
 
-CALIBRATION_EPOCHS = 60
-"""Passes over the history used to converge the static EKF parameters."""
+MIN_CV_IMPROVEMENT = 0.05
+"""Minimum relative RMSE improvement over the prior baseline in cross-validation."""
 
-_PROCESS_NOISE = (1.0, 1.0, 1e-2, 1e-2, 1e-2, 1e-2)
+RIDGE_LAMBDA = 1e-2
+"""Ridge strength pulling the fitted coefficients toward the prior shape."""
+
 _MIN_SCALE = 1e-9
+_PARAMETER_COUNT = 3
+_SQRT_RIDGE = math.sqrt(RIDGE_LAMBDA)
 
 
 class CalibrationResult(BaseModel):
-    """Outcome of fitting the Banister parameters to observed performance."""
+    """Outcome of fitting the Banister gains to observed performance."""
 
     params: BanisterParams = Field(description="Effective parameters (calibrated or prior).")
     priors: BanisterParams = Field(description="Reference priors used as the fallback.")
     calibrated: bool = Field(description="Whether the fit passed the quality gate.")
     observations: int = Field(ge=0, description="Number of observed performance points.")
     r_squared: float | None = Field(
-        default=None, description="Coefficient of determination of the fit, if computable."
+        default=None, description="In-sample coefficient of determination of the fit."
     )
     baseline_efficiency: float | None = Field(
         default=None, description="Median efficiency factor used to normalise observations."
     )
+    cv_rmse: float | None = Field(
+        default=None, description="Leave-one-out RMSE of the calibrated model."
+    )
+    prior_cv_rmse: float | None = Field(
+        default=None, description="Leave-one-out RMSE of the prior-shaped baseline."
+    )
+    cv_improvement: float | None = Field(
+        default=None, description="Relative RMSE improvement over the prior baseline."
+    )
 
 
-def calibrate_banister(
+def calibrate_banister(  # noqa: PLR0911
     daily_loads: Sequence[float],
     observations: Mapping[int, float],
     prior: BanisterParams,
-    *,
-    epochs: int = CALIBRATION_EPOCHS,
 ) -> CalibrationResult:
-    """Fit the Banister parameters with the EKF, falling back to the prior.
-
-    Observations are raw efficiency factors keyed by day index. They are
-    normalised by their median so the fit is scale-free, then the EKF is iterated
-    so the static parameters converge. The fit is accepted only when it has enough
-    observations and explains a minimum share of the variance; otherwise the prior
-    is returned unchanged.
+    """Fit the Banister gains with the time constants fixed at the prior.
 
     Args:
         daily_loads: One training-load value per day (rest days = ``0.0``).
         observations: Observed efficiency factors keyed by day index.
-        prior: Reference parameters used as the EKF prior and as the fallback.
-        epochs: Number of passes over the history used to converge the filter.
+        prior: Reference parameters; its time constants stay fixed and it is the
+            fallback when the fit does not pass the quality gate.
 
     Returns:
         The calibration outcome, always carrying usable effective parameters.
     """
     count = len(observations)
     if count < MIN_OBSERVATIONS or not daily_loads:
-        return CalibrationResult(params=prior, priors=prior, calibrated=False, observations=count)
+        return _fallback(prior, count)
 
     baseline = statistics.median(observations.values())
     if not math.isfinite(baseline) or baseline <= 0.0:
-        return CalibrationResult(params=prior, priors=prior, calibrated=False, observations=count)
+        return _fallback(prior, count)
 
     relative = {day: value / baseline for day, value in observations.items()}
-    measurement_noise = statistics.pvariance(relative.values())
-    if not math.isfinite(measurement_noise) or measurement_noise <= 0.0:
-        return CalibrationResult(
-            params=prior,
-            priors=prior,
-            calibrated=False,
-            observations=count,
-            baseline_efficiency=baseline,
-        )
+    days = sorted(day for day in relative if 0 <= day < len(daily_loads))
+    if len(days) < MIN_OBSERVATIONS:
+        return _fallback(prior, count, baseline=baseline)
+    y = np.array([relative[day] for day in days], dtype=float)
+    if float(np.std(y)) <= _MIN_SCALE:
+        return _fallback(prior, count, baseline=baseline)
 
-    relative_prior = prior.model_copy(update={"p0": 1.0})
-    ekf = BanisterEKF(
-        relative_prior,
-        process_noise=_PROCESS_NOISE,
-        measurement_noise=measurement_noise,
+    response = impulse_response(daily_loads, prior)
+    fitness = np.asarray(response.fitness, dtype=float)
+    fatigue = np.asarray(response.fatigue, dtype=float)
+    net_prior = prior.k1 * fitness - prior.k2 * fatigue
+    offset = float(np.median(net_prior))
+    spread = float(np.std(net_prior))
+    if spread <= _MIN_SCALE:
+        return _fallback(prior, count, baseline=baseline)
+
+    design = np.column_stack([np.ones(len(daily_loads), dtype=float), fitness, -fatigue])
+    rows = design[days]
+    scales = _column_scales(rows)
+    prior_coefficients = _prior_coefficients(y, offset, spread, prior)
+    coefficients = _solve_ridge(rows, y, prior_coefficients, scales)
+    if coefficients is None:
+        return _fallback(prior, count, baseline=baseline)
+
+    r_squared = _r_squared(y, rows @ coefficients)
+    cross_validation = _cross_validate(
+        rows, y, offset=offset, spread=spread, prior=prior, scales=scales
     )
-    for _ in range(epochs):
-        ekf.run(daily_loads, relative)
+    if cross_validation is None:
+        return _fallback(prior, count, baseline=baseline, r_squared=r_squared)
+    cv_rmse, prior_cv_rmse = cross_validation
+    improvement = 1.0 - cv_rmse / prior_cv_rmse if prior_cv_rmse > _MIN_SCALE else -math.inf
 
-    fit = ekf.parameters
-    r_squared = _r_squared(daily_loads, fit, relative)
+    p0, k1, k2 = (float(value) for value in coefficients)
+    if k1 <= 0.0 or k2 <= 0.0:
+        return _fallback(
+            prior,
+            count,
+            baseline=baseline,
+            r_squared=r_squared,
+            cv_rmse=cv_rmse,
+            prior_cv_rmse=prior_cv_rmse,
+            cv_improvement=improvement,
+        )
+    fit = BanisterParams(p0=p0, k1=k1, k2=k2, tau1=prior.tau1, tau2=prior.tau2)
     calibrated = (
         r_squared is not None
         and math.isfinite(r_squared)
         and r_squared >= MIN_R_SQUARED
+        and math.isfinite(improvement)
+        and improvement >= MIN_CV_IMPROVEMENT
         and fit.tau1 > fit.tau2
     )
     params = _rescale_to_prior(fit, prior, daily_loads) if calibrated else prior
@@ -121,24 +153,120 @@ def calibrate_banister(
         observations=count,
         r_squared=r_squared,
         baseline_efficiency=baseline,
+        cv_rmse=cv_rmse,
+        prior_cv_rmse=prior_cv_rmse,
+        cv_improvement=improvement,
     )
 
 
-def _r_squared(
-    daily_loads: Sequence[float],
-    params: BanisterParams,
-    observations: Mapping[int, float],
-) -> float | None:
-    """Return the coefficient of determination of a fit, or ``None``."""
-    valid_days = [day for day in sorted(observations) if 0 <= day < len(daily_loads)]
-    if not valid_days:
+def _fallback(
+    prior: BanisterParams,
+    observations: int,
+    *,
+    baseline: float | None = None,
+    r_squared: float | None = None,
+    cv_rmse: float | None = None,
+    prior_cv_rmse: float | None = None,
+    cv_improvement: float | None = None,
+) -> CalibrationResult:
+    """Return the prior unchanged with whatever diagnostics were computed."""
+    return CalibrationResult(
+        params=prior,
+        priors=prior,
+        calibrated=False,
+        observations=observations,
+        r_squared=r_squared,
+        baseline_efficiency=baseline,
+        cv_rmse=cv_rmse,
+        prior_cv_rmse=prior_cv_rmse,
+        cv_improvement=cv_improvement,
+    )
+
+
+def _column_scales(rows: np.ndarray) -> np.ndarray:
+    """Return per-column scales used to stabilise the ridge system."""
+    return np.array(
+        [
+            1.0,
+            max(float(np.std(rows[:, 1])), _MIN_SCALE),
+            max(float(np.std(rows[:, 2])), _MIN_SCALE),
+        ]
+    )
+
+
+def _prior_coefficients(
+    observations: np.ndarray,
+    offset: float,
+    spread: float,
+    prior: BanisterParams,
+) -> np.ndarray:
+    """Return the prior shape with its intercept and scale matched to the data."""
+    observed_spread = float(np.std(observations))
+    scale = observed_spread / spread if spread > _MIN_SCALE else 0.0
+    return np.array([1.0 - scale * offset, scale * prior.k1, scale * prior.k2], dtype=float)
+
+
+def _solve_ridge(
+    rows: np.ndarray,
+    observations: np.ndarray,
+    prior_coefficients: np.ndarray,
+    scales: np.ndarray,
+) -> np.ndarray | None:
+    """Solve the bounded ridge least-squares problem in standardised units."""
+    if len(observations) < _PARAMETER_COUNT:
         return None
-    fitted = impulse_response(daily_loads, params)
-    measured = [observations[day] for day in valid_days]
-    predicted = [fitted.performance[day] for day in valid_days]
-    mean = statistics.fmean(measured)
-    ss_res = sum((actual - model) ** 2 for actual, model in zip(measured, predicted, strict=True))
-    ss_tot = sum((actual - mean) ** 2 for actual in measured)
+    standardised = rows / scales
+    prior_standardised = prior_coefficients * scales
+    design = np.vstack([standardised, _SQRT_RIDGE * np.eye(_PARAMETER_COUNT, dtype=float)])
+    target = np.concatenate([observations, _SQRT_RIDGE * prior_standardised])
+    lower = np.array([-10.0, 0.0, 0.0], dtype=float) * scales
+    upper = np.array([10.0, np.inf, np.inf], dtype=float) * scales
+    solution = lsq_linear(design, target, bounds=(lower, upper), method="trf")
+    if not solution.success:
+        return None
+    coefficients: np.ndarray = np.asarray(solution.x, dtype=float) / scales
+    if not np.all(np.isfinite(coefficients)):
+        return None
+    return coefficients
+
+
+def _cross_validate(
+    rows: np.ndarray,
+    observations: np.ndarray,
+    *,
+    offset: float,
+    spread: float,
+    prior: BanisterParams,
+    scales: np.ndarray,
+) -> tuple[float, float] | None:
+    """Return the leave-one-out RMSE of the fit and of the prior baseline."""
+    count = len(observations)
+    if count < _PARAMETER_COUNT + 1:
+        return None
+    squared_fit: list[float] = []
+    squared_prior: list[float] = []
+    for index in range(count):
+        train = np.ones(count, dtype=bool)
+        train[index] = False
+        prior_coefficients = _prior_coefficients(observations[train], offset, spread, prior)
+        coefficients = _solve_ridge(rows[train], observations[train], prior_coefficients, scales)
+        if coefficients is None:
+            return None
+        predicted_fit = float(rows[index] @ coefficients)
+        predicted_prior = float(rows[index] @ prior_coefficients)
+        squared_fit.append((predicted_fit - observations[index]) ** 2)
+        squared_prior.append((predicted_prior - observations[index]) ** 2)
+    return (
+        math.sqrt(float(np.mean(squared_fit))),
+        math.sqrt(float(np.mean(squared_prior))),
+    )
+
+
+def _r_squared(measured: np.ndarray, predicted: np.ndarray) -> float | None:
+    """Return the coefficient of determination, or ``None`` when undefined."""
+    mean = float(np.mean(measured))
+    ss_res = float(np.sum((measured - predicted) ** 2))
+    ss_tot = float(np.sum((measured - mean) ** 2))
     if ss_tot <= 0.0:
         return None
     return 1.0 - ss_res / ss_tot

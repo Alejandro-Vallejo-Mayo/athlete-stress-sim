@@ -19,8 +19,8 @@ from athlete_stress_sim.backend.schemas.ingest import SyncResponse
 from athlete_stress_sim.backend.schemas.metrics import (
     AcwrResponse,
     BanisterSeriesResponse,
+    CalibrationResponse,
     DecouplingResponse,
-    EkfCalibrationResponse,
     PlannedSession,
     RunningBaselineResponse,
     TaperPlanRequest,
@@ -78,9 +78,9 @@ class MetricsClient:
         """Fetch the per-kilometre efficiency and aerobic decoupling of an exercise."""
         return DecouplingResponse.model_validate(self._get(f"/metrics/decoupling/{exercise_id}"))
 
-    def get_ekf(self) -> EkfCalibrationResponse:
+    def get_calibration(self) -> CalibrationResponse:
         """Fetch the calibrated Banister parameters and their validation."""
-        return EkfCalibrationResponse.model_validate(self._get("/metrics/ekf"))
+        return CalibrationResponse.model_validate(self._get("/metrics/calibration"))
 
     def get_running_baseline(self) -> RunningBaselineResponse | None:
         """Fetch the recent weekly running volume, or ``None`` without enough data."""

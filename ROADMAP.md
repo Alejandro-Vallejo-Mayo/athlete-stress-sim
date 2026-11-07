@@ -59,7 +59,7 @@
 
 ## 3. Objetivos y criterios de éxito
 
-**Objetivo final:** una plataforma end-to-end que ingeste telemetría Polar, calcule carga (TRIMP), modele Fitness-Fatiga (EDO + EKF), evalúe riesgo de lesión (ACWR) y ofrezca un dashboard interactivo con simulador de *tapering* para llegar óptimamente a la Media Maratón.
+**Objetivo final:** una plataforma end-to-end que ingeste telemetría Polar, calcule carga (TRIMP), modele Fitness-Fatiga (EDO + calibración NLS), evalúe riesgo de lesión (ACWR) y ofrezca un dashboard interactivo con simulador de *tapering* para llegar óptimamente a la Media Maratón.
 
 **Criterios de éxito (medibles):**
 
@@ -77,7 +77,7 @@
 | Fase | Mes | Semanas | Nombre | Entregable principal |
 |------|-----|---------|--------|----------------------|
 | **F0** | 1 | S1–S4 | Fundamentos, Polar y DuckDB | Telemetría cruda persistida |
-| **F1** | 2 | S5–S9 | Motor Fisiológico | TRIMP, ACWR, EDO y EKF funcionales |
+| **F1** | 2 | S5–S9 | Motor Fisiológico | TRIMP, ACWR, EDO y calibración funcionales |
 | **F2** | 3 | S10–S13 | API + Dashboard | Dashboard interactivo + simulador |
 | **F3** | 4 | S14–S16 | Uso real, validación y portfolio | Sistema validado + README público |
 
@@ -189,7 +189,7 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 - [x] Bench para verificar `RNF-02` (< 0.5 s).
 
 #### Semana 9 — Filtro de Kalman Extendido (EKF)
-**Objetivo:** ajustar parámetros individuales (`RF-03.2`).
+**Objetivo:** ajustar parámetros individuales (`RF-03.2`). *Sustituido en S14 por NLS con `tau` fijo + ridge y gate CV; se conserva como referencia histórica.*
 
 - [x] Implementar EKF con `filterpy` para estimar `k_1, k_2, tau_1, tau_2` (estado aumentado).
 - [x] Integrar observaciones de rendimiento (el EKF las consume; la extracción real de ritmo a HR constante se difiere a S14).
@@ -237,7 +237,7 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 **Objetivo:** poner el sistema a trabajar con datos reales.
 
 - [x] Sincronizar al menos 2 semanas de datos reales (3 gym + 3 carrera). Verificado: 14 carrera + 11 gym (2026-10-03 → 2026-11-03), 11/11 gym con RPE.
-- [x] Validar parámetros EKF contra observaciones reales. Integrado vía `GET /metrics/ekf` con quality gate; con 13 observaciones reales R²≈-0.01, por lo que el pipeline cae a priors.
+- [x] Validar parámetros EKF contra observaciones reales. Tras el estudio de calibración, producción usa NLS con `tau` fijo + ridge y gate por validación cruzada (`GET /metrics/calibration`, alias `/metrics/ekf`); con 13 observaciones reales no supera el gate y cae a priors.
 - [x] Ajustar tapering para las semanas previas a la Media Maratón. Implementado `POST /simulate/taper/plan` + panel `Race taper` (factores 0,75/0,55/0,35, baseline de 4 semanas); validado con datos reales, el freshness máximo cae el 2026-12-13.
 - [ ] Corrección de bugs encontrados en uso real.
 
@@ -269,7 +269,7 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 - [x] Tests de `src/athlete_stress_sim/core/etl` en verde.
 
 ### Fase 1 — DoD
-- [x] TRIMP (carrera y gym), ACWR, EDO Banister y EKF implementados y testeados.
+- [x] TRIMP (carrera y gym), ACWR, EDO Banister y calibración implementados y testeados (EKF sustituido por NLS en S14).
 - [x] Cobertura de `src/athlete_stress_sim/core` ≥ 80 %.
 - [x] Simulación EDO < 0.5 s.
 
@@ -291,8 +291,8 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 |--------|---------|--------------|------------|
 | Dependencia de disponibilidad/rate-limit de la API Polar | Alto | Media | Sincronización *catch-up* idempotente (arranque + botón) con reintentos/backoff y `Retry-After`; cacheo local (S3). |
 | `AccessLink` v4 (Dynamic API, JSON) podría simplificar la ingesta | Medio | Baja | Evaluada en S3; se mantiene v3 (FIT/TCX) y la migración se difiere a F3 si aporta valor. |
-| Datos insuficientes para calibrar el EKF (pocas semanas) | Alto | Media | Usar priors bibliográficos; arrancar con valores de referencia (S1). |
-| Complejidad matemática (EDO + EKF) consume más tiempo del previsto | Alto | Media | Separar métricas (F1) de modelos (F1 tardía); priorizar TRIMP/ACWR como MVP. |
+| Datos insuficientes para calibrar el modelo (pocas semanas) | Alto | Media | Usar priors bibliográficos; arrancar con valores de referencia (S1). |
+| Complejidad matemática (EDO + calibración) consume más tiempo del previsto | Alto | Media | Separar métricas (F1) de modelos (F1 tardía); priorizar TRIMP/ACWR como MVP. |
 | Curva de aprendizaje de Plotly Dash + Mantine | Medio | Media | Esqueleto temprano (S11); componentes reutilizables. |
 | Fixtures `.FIT` de ejemplo limitadas | Medio | Baja | Generar datos sintéticos además de capturas reales (S4). |
 | Exposición accidental de credenciales | Alto | Baja | `.env` en `.gitignore`; revisión final (S16). |
@@ -311,7 +311,7 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 
 **Should have (alto valor, esfuerzo medio):**
 - `RF-05.2` Simulador de tapering
-- `RF-03.2` EKF
+- `RF-03.2` Calibración (NLS)
 - `RF-05.3` Desacoplamiento aeróbico
 
 **Could have (si sobra tiempo):**

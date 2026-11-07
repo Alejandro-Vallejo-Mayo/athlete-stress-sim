@@ -1,8 +1,8 @@
-"""Observed running performance for the Banister EKF (``RF-03.2``).
+"""Observed running performance used to calibrate the Banister gains (``RF-03.2``).
 
-The extended Kalman filter (``core.models.ekf``) tunes the individual Banister
-parameters from observed performance. ``RF-03.2`` defines that observation as
-pace at a constant heart rate; this module approximates it with the session-level
+The calibration (``core.models.calibration``) tunes the individual Banister gains
+from observed performance. ``RF-03.2`` defines that observation as pace at a
+constant heart rate; this module approximates it with the session-level
 efficiency factor ``EF = speed / HR`` (the same quantity the aerobic-decoupling
 metric uses per kilometre, ``RF-05.3``). A higher EF means more speed at the same
 heart rate, so a higher EF is better performance.

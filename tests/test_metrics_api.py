@@ -306,14 +306,21 @@ def test_taper_rejects_invalid_session(client: TestClient) -> None:
     assert client.post("/simulate/taper", json={"sessions": sessions}).status_code == 422
 
 
-def test_ekf_falls_back_to_priors_without_observations(client: TestClient) -> None:
-    body = client.get("/metrics/ekf").json()
+def test_calibration_falls_back_to_priors_without_observations(client: TestClient) -> None:
+    body = client.get("/metrics/calibration").json()
 
     assert body["calibrated"] is False
     assert body["observations"] == 0
     assert body["params"] == body["priors"]
+    assert body["cv_rmse"] is None
     assert body["priors"]["k1"] == pytest.approx(physiology.k_1)
     assert body["priors"]["k2"] == pytest.approx(physiology.k_2)
+
+
+def test_ekf_alias_still_returns_calibration(client: TestClient) -> None:
+    body = client.get("/metrics/ekf").json()
+
+    assert body["params"] == body["priors"]
 
 
 def _timed_run(start: datetime, distance_m: float = 10_000.0) -> ParsedSession:

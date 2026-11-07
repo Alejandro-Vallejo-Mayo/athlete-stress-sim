@@ -11,7 +11,7 @@ from athlete_stress_sim.core.models.banister import BanisterParams, impulse_resp
 from athlete_stress_sim.core.models.calibration import calibrate_banister
 
 _TRUE = BanisterParams(p0=1000.0, k1=1.0, k2=2.0, tau1=45.0, tau2=15.0)
-_PRIOR = BanisterParams(p0=1000.0, k1=1.0, k2=2.0, tau1=42.0, tau2=12.0)
+_PRIOR = BanisterParams(p0=1000.0, k1=1.0, k2=1.0, tau1=42.0, tau2=12.0)
 
 
 def _loads(days: int = 300) -> list[float]:
@@ -82,6 +82,10 @@ def test_calibrates_synthetic_banister_performance() -> None:
     assert result.calibrated is True
     assert result.r_squared is not None
     assert result.r_squared > 0.3
+    assert result.cv_rmse is not None
+    assert result.prior_cv_rmse is not None
+    assert result.cv_improvement is not None
+    assert result.cv_improvement > 0.05
     assert result.params.p0 == _PRIOR.p0
     assert result.params.k2 > result.params.k1
     assert result.params.tau1 > result.params.tau2
