@@ -28,6 +28,11 @@ from athlete_stress_sim.backend.schemas.metrics import (
     TaperSimulationRequest,
     TaperSimulationResponse,
 )
+from athlete_stress_sim.backend.schemas.prediction import (
+    EffortOut,
+    RacePredictionRequest,
+    RacePredictionResponse,
+)
 from athlete_stress_sim.core.models.banister import BanisterParams
 
 DEFAULT_API_URL = "http://localhost:8000"
@@ -81,6 +86,18 @@ class MetricsClient:
     def get_calibration(self) -> CalibrationResponse:
         """Fetch the calibrated Banister parameters and their validation."""
         return CalibrationResponse.model_validate(self._get("/metrics/calibration"))
+
+    def get_best_efforts(self) -> list[EffortOut]:
+        """Fetch the best detected training effort for each reference distance."""
+        payload = self._get("/metrics/best-efforts")
+        return TypeAdapter(list[EffortOut]).validate_python(payload)
+
+    def predict_race(self, request: RacePredictionRequest) -> RacePredictionResponse:
+        """Predict a race time from detected efforts and/or a manual reference."""
+        payload = request.model_dump(mode="json")
+        return RacePredictionResponse.model_validate(
+            self._post("/metrics/race-prediction", payload)
+        )
 
     def get_running_baseline(self) -> RunningBaselineResponse | None:
         """Fetch the recent weekly running volume, or ``None`` without enough data."""

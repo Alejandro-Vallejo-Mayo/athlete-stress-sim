@@ -285,7 +285,48 @@ los introduces tú.
 > El plan solo proyecta carrera: no reduce las sesiones de gimnasio. Ajusta esas sesiones aparte si
 > quieres modelar la descarga completa.
 
-## 9. Endpoints útiles
+## 9. Predicción de carrera (`Race predictor`)
+
+Estima el tiempo que podrías hacer en una carrera a tope a partir de tus mejores esfuerzos. No usa
+el ritmo bruto de un rodaje: cada esfuerzo se clasifica por **%HRR** (reserva de frecuencia
+cardíaca) y se compara con su **EF** (velocidad/FC), de modo que entrenar suave no hace que la
+predicción sea lenta.
+
+1. Elige la distancia (5k, 10k, media maratón, maratón o **Custom**). Si eliges **Custom**,
+   aparece un campo para escribir la distancia.
+2. Opcionalmente introduce una carrera o test de referencia (distancia y tiempo). Si lo dejas
+   vacío, se usan los mejores esfuerzos detectados en el historial.
+3. Pulsa **Predict**. La UI usa siempre selección automática de modelo; la API permite forzar
+   `riegel` o `critical_speed` si lo necesitas.
+
+Niveles de intensidad usados para seleccionar referencias:
+
+| Nivel | %HRR | Uso |
+| --- | --- | --- |
+| `race` | ≥ 88% | Referencia directa; confianza alta. |
+| `hard` | 80–88% | Referencia con confianza media. |
+| `moderate` | 70–80% | Solo con confianza baja. |
+| `easy` | < 70% | No se usa como ritmo de carrera; solo tendencia de EF/fitness. |
+
+Modelos:
+
+- **Riegel**: `T2 = T1 · (D2 / D1)^k`, con `k ≈ 1.06`. Necesita una referencia.
+- **Critical speed**: `D = CS · T + D'`, ajustado con 2–3 esfuerzos de calidad en distancias
+  distintas.
+- **Auto**: usa critical speed si hay al menos tres esfuerzos de calidad y buen `R²`; si no,
+  Riegel; si solo hay rodajes fáciles, extrapola con EF y FC de carrera y marca confianza baja.
+
+La respuesta incluye tiempo central, ritmo, horquilla rápida/lenta, modelo, confianza, esfuerzos
+usados y notas. Cada esfuerzo se ajusta por el cambio de fitness de Banister desde su fecha y se
+convierte a un **tiempo equivalente a esfuerzo de carrera**: se estima la velocidad a un `%HRR`
+objetivo según la distancia de la referencia (≈93% en 5k, 90% en 10k, 88% en media y 85% en
+maratón) usando su EF (`velocidad/FC`), con un límite del `+15%` para no extrapolar en exceso. Así
+un tramo al 80% HRR no devuelve el mismo tiempo que una carrera a tope.
+
+> Es una predicción de **potencial**, no de “hoy”: no descuenta la fatiga del día. Un test o carrera
+> real mejora mucho la confianza; los tramos de entrenamiento son una referencia conservadora.
+
+## 10. Endpoints útiles
 
 La API expone las mismas métricas que consume el dashboard. La documentación interactiva está en
 `http://localhost:8000/docs`.
@@ -313,8 +354,10 @@ La API expone las mismas métricas que consume el dashboard. La documentación i
 | `POST` | `/simulate` | Simular una serie de cargas diarias arbitraria. |
 | `POST` | `/simulate/taper` | Simular sesiones planificadas sobre el historial. |
 | `POST` | `/simulate/taper/plan` | Generar un plan de taper progresivo hasta race day. |
+| `GET` | `/metrics/best-efforts` | Mejores esfuerzos detectados por distancia, con %HRR y EF. |
+| `POST` | `/metrics/race-prediction` | Predecir tiempo de carrera (auto, Riegel o critical speed). |
 
-## 10. Limitaciones que afectan a la interpretación
+## 11. Limitaciones que afectan a la interpretación
 
 - **Solo cuentan las sesiones con carga calculable**. Una sesión de fuerza sin RPE, o una carrera
   sin muestras de FC, no aporta carga y puede hacer que el ACWR y las curvas subestimen el
@@ -326,6 +369,9 @@ La API expone las mismas métricas que consume el dashboard. La documentación i
   rendimiento observado (EF) apenas varía y el ajuste puede no superar los umbrales de R² y de
   mejora en validación cruzada, en cuyo caso el dashboard usa los priors. Consulta
   `/metrics/calibration` para ver si la calibración está activa y cuánto mejora.
+- **La predicción de carrera es un potencial**, no una garantía: depende de la calidad de las
+  referencias (tests/carreras), del %HRR de los esfuerzos y de la extrapolación de distancia. Los
+  tramos de entrenamiento no son equivalentes a una carrera a tope.
 - **El plan de taper solo modela carrera** y asume que el entrenamiento entre hoy y el inicio de la
   descarga sigue el historial; no reduce automáticamente las sesiones de gimnasio.
 - **La carga combinada es una simplificación**: TRIMP de carrera y sRPE de fuerza se suman en AU

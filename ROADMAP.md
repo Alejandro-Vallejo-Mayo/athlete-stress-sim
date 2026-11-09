@@ -239,6 +239,7 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 - [x] Sincronizar al menos 2 semanas de datos reales (3 gym + 3 carrera). Verificado: 14 carrera + 11 gym (2026-10-03 → 2026-11-03), 11/11 gym con RPE.
 - [x] Validar parámetros EKF contra observaciones reales. Tras el estudio de calibración, producción usa NLS con `tau` fijo + ridge y gate por validación cruzada (`GET /metrics/calibration`, alias `/metrics/ekf`); con 13 observaciones reales no supera el gate y cae a priors.
 - [x] Ajustar tapering para las semanas previas a la Media Maratón. Implementado `POST /simulate/taper/plan` + panel `Race taper` (factores 0,75/0,55/0,35, baseline de 4 semanas); validado con datos reales, el freshness máximo cae el 2026-12-13.
+- [x] Predicción de tiempo de carrera (`RF-05.4`). Implementados `GET /metrics/best-efforts` y `POST /metrics/race-prediction` + panel `Race predictor` con Riegel, velocidad crítica, %HRR, EF, ajuste por fitness, horquilla y confianza.
 - [ ] Corrección de bugs encontrados en uso real.
 
 #### Semana 15 — Optimización, Docker y CI/CD

@@ -10,6 +10,8 @@ import httpx2
 import pytest
 
 from athlete_stress_sim.backend.schemas.metrics import PlannedSession, TaperPlanRequest
+from athlete_stress_sim.backend.schemas.prediction import RacePredictionRequest
+from athlete_stress_sim.core.metrics.race_prediction import PredictionModel
 from athlete_stress_sim.core.models.banister import BanisterParams
 from athlete_stress_sim.frontend import app as frontend_app
 from athlete_stress_sim.frontend.api import MetricsClient, MetricsClientError
@@ -226,6 +228,60 @@ def test_metrics_client_sets_rpe() -> None:
 
     assert exercise.rpe == pytest.approx(7.0)
     assert captured["rpe"] == pytest.approx(7.0)
+
+
+def test_metrics_client_gets_best_efforts() -> None:
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        assert request.url.path == "/metrics/best-efforts"
+        return httpx2.Response(
+            200,
+            json=[
+                {
+                    "distance_km": 5.0,
+                    "time_s": 1600.0,
+                    "day": "2026-10-01",
+                    "tier": "race",
+                    "source": "training",
+                }
+            ],
+        )
+
+    efforts = _client(handler).get_best_efforts()
+
+    assert efforts[0].distance_km == pytest.approx(5.0)
+    assert efforts[0].tier.value == "race"
+
+
+def test_metrics_client_predicts_race() -> None:
+    captured: dict[str, object] = {}
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        assert request.url.path == "/metrics/race-prediction"
+        captured.update(json.loads(request.content))
+        return httpx2.Response(
+            200,
+            json={
+                "distance_km": 21.0975,
+                "predicted_time_s": 7200.0,
+                "predicted_pace_s_per_km": 341.3,
+                "fast_time_s": 7000.0,
+                "slow_time_s": 7400.0,
+                "model": "critical_speed",
+                "confidence": "high",
+                "efforts": [],
+                "notes": ["Ready."],
+            },
+        )
+
+    request = RacePredictionRequest(
+        distance_km=21.0975,
+        model=PredictionModel.AUTO,
+    )
+    response = _client(handler).predict_race(request)
+
+    assert response.model is PredictionModel.CRITICAL_SPEED
+    assert response.predicted_time_s == pytest.approx(7200.0)
+    assert captured["distance_km"] == pytest.approx(21.0975)
 
 
 def test_metrics_client_gets_running_baseline() -> None:

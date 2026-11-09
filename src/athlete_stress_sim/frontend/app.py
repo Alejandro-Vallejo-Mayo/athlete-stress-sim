@@ -23,6 +23,11 @@ from athlete_stress_sim.backend.schemas.metrics import (
     TaperPlanRequest,
     TaperSimulationResponse,
 )
+from athlete_stress_sim.backend.schemas.prediction import (
+    RacePredictionRequest,
+    RaceReference,
+)
+from athlete_stress_sim.core.metrics.race_prediction import PredictionModel, format_duration
 from athlete_stress_sim.frontend.api import MetricsClient, MetricsClientError
 from athlete_stress_sim.frontend.components.acwr_gauge import build_acwr_gauge
 from athlete_stress_sim.frontend.components.decoupling import (
@@ -31,6 +36,14 @@ from athlete_stress_sim.frontend.components.decoupling import (
     decoupling_status_text,
 )
 from athlete_stress_sim.frontend.components.fitness_chart import build_fitness_figure
+from athlete_stress_sim.frontend.components.race_predictor import (
+    effort_rows,
+    format_pace,
+    note_rows,
+    optional_float,
+    preset_distance,
+    race_predictor_panel,
+)
 from athlete_stress_sim.frontend.components.rpe import (
     pending_gym_sessions,
     rpe_modal,
@@ -161,6 +174,7 @@ def create_app(client: MetricsClient | None = None) -> dash.Dash:
                     decoupling_panel(),
                     simulator_panel(),
                     race_taper_panel(),
+                    race_predictor_panel(),
                     rpe_modal(),
                     dcc.Store(id="sim-sessions", data=[]),
                     dcc.Store(id="data-refreshed", data=0),
@@ -313,7 +327,111 @@ def create_app(client: MetricsClient | None = None) -> dash.Dash:
 
     _register_rpe_callbacks(app, metrics_client)
     _register_race_taper_callbacks(app, metrics_client)
+    _register_race_predictor_callbacks(app, metrics_client)
     return app
+
+
+def _register_race_predictor_callbacks(app: dash.Dash, client: MetricsClient) -> None:
+    """Register the race predictor form and best-effort list callbacks."""
+
+    @app.callback(
+        Output("race-distance-custom", "style"),
+        Input("race-distance-preset", "value"),
+    )
+    def toggle_custom_distance(preset: str | None) -> dict[str, str]:
+        """Show the custom distance field only when the custom preset is selected."""
+        return {"display": "block"} if preset == "custom" else {"display": "none"}
+
+    @app.callback(
+        Output("race-efforts-list", "children"),
+        Input("data-refreshed", "data"),
+    )
+    def load_best_efforts(_refreshed: int | None) -> list[object]:
+        """Show the best efforts detected in the persisted history."""
+        try:
+            efforts = client.get_best_efforts()
+        except MetricsClientError:
+            return [dmc.Text("Backend offline.", c="red", size="sm")]
+        return list(effort_rows(efforts))
+
+    @app.callback(
+        Output("race-result-time", "children"),
+        Output("race-result-pace", "children"),
+        Output("race-result-range", "children"),
+        Output("race-result-meta", "children"),
+        Output("race-result-notes", "children"),
+        Output("race-efforts-list", "children", allow_duplicate=True),
+        Input("race-predict", "n_clicks"),
+        State("race-distance-preset", "value"),
+        State("race-distance-custom", "value"),
+        State("race-reference-distance", "value"),
+        State("race-reference-minutes", "value"),
+        prevent_initial_call=True,
+    )
+    def run_race_prediction(  # noqa: PLR0917
+        _clicks: int | None,
+        preset: str | None,
+        custom_distance_km: object,
+        reference_distance_km: object,
+        reference_minutes: object,
+    ) -> tuple[object, object, object, object, list[object], list[object]]:
+        """Predict the race time and render the result and the efforts used."""
+        target_distance = (
+            optional_float(custom_distance_km) if preset == "custom" else preset_distance(preset)
+        )
+        if target_distance is None or target_distance <= 0.0:
+            return ("—", "—", "", "Enter a target distance.", [], [])
+        reference_km = optional_float(reference_distance_km)
+        reference_min = optional_float(reference_minutes)
+        if (reference_km is None) != (reference_min is None):
+            return (
+                "—",
+                "—",
+                "",
+                "Provide both reference distance and time, or neither.",
+                [],
+                [],
+            )
+        reference = None
+        if reference_km is not None and reference_min is not None:
+            reference = RaceReference(
+                distance_km=reference_km,
+                time_s=reference_min * 60.0,
+            )
+        try:
+            prediction = client.predict_race(
+                RacePredictionRequest(
+                    distance_km=target_distance,
+                    model=PredictionModel.AUTO,
+                    reference=reference,
+                )
+            )
+        except (MetricsClientError, ValueError):
+            return ("—", "—", "", "Backend offline or invalid input.", [], [])
+        predicted_time = prediction.predicted_time_s
+        if predicted_time is None:
+            return (
+                "—",
+                "—",
+                "",
+                f"{prediction.model.value} · {prediction.confidence.value} confidence",
+                list(note_rows(prediction.notes)),
+                list(effort_rows(prediction.efforts)),
+            )
+        time_text = format_duration(predicted_time)
+        pace_text = format_pace(prediction.predicted_pace_s_per_km)
+        fast = "—" if prediction.fast_time_s is None else format_duration(prediction.fast_time_s)
+        slow = "—" if prediction.slow_time_s is None else format_duration(prediction.slow_time_s)
+        range_text = f"Range: {fast} – {slow}"
+        meta = f"{prediction.model.value} · {prediction.confidence.value} confidence"
+        return (
+            time_text,
+            pace_text,
+            range_text,
+            meta,
+            list(note_rows(prediction.notes)),
+            list(effort_rows(prediction.efforts)),
+        )
 
 
 def _register_rpe_callbacks(app: dash.Dash, client: MetricsClient) -> None:
