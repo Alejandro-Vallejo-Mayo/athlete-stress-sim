@@ -1,0 +1,112 @@
+"""Tests for the pending gym RPE badge helpers (``S14``)."""
+
+from __future__ import annotations
+
+from collections.abc import Iterator
+from datetime import datetime
+
+from dash.development.base_component import Component
+
+from athlete_stress_sim.backend.schemas.exercises import ExerciseOut
+from athlete_stress_sim.frontend.components.rpe import (
+    pending_gym_sessions,
+    rpe_modal,
+    rpe_pending_style,
+    rpe_session_options,
+)
+from athlete_stress_sim.frontend.components.simulator import race_taper_panel, simulator_panel
+
+_START = datetime(2026, 10, 4, 18, 0, 0)
+
+
+def _exercise(
+    exercise_id: str,
+    *,
+    rpe: float | None = None,
+    duration_s: float | None = 3600.0,
+    start_time: datetime | None = _START,
+) -> ExerciseOut:
+    return ExerciseOut(
+        exercise_id=exercise_id,
+        sport="training",
+        sub_sport="strength_training",
+        start_time=start_time,
+        duration_s=duration_s,
+        rpe=rpe,
+    )
+
+
+def test_pending_gym_sessions_filters_out_recorded_rpe() -> None:
+    exercises = [
+        _exercise("gym1", rpe=None),
+        _exercise("gym2", rpe=7.0),
+        _exercise("gym3", rpe=None),
+    ]
+
+    pending = pending_gym_sessions(exercises)
+
+    assert [exercise.exercise_id for exercise in pending] == ["gym1", "gym3"]
+
+
+def test_rpe_session_options_build_labels() -> None:
+    exercises = [
+        _exercise("gym1"),
+        _exercise("gym2", duration_s=None, start_time=None),
+    ]
+
+    options = rpe_session_options(exercises)
+
+    assert options[0] == {"value": "gym1", "label": "2026-10-04 · 60 min"}
+    assert options[1] == {"value": "gym2", "label": "unknown · no duration"}
+
+
+def test_rpe_pending_style_hides_when_empty() -> None:
+    assert rpe_pending_style(0) == {"display": "none"}
+    assert rpe_pending_style(2) == {"display": "flex"}
+
+
+def _iter_components(component: object) -> Iterator[Component]:
+    if not isinstance(component, Component):
+        return
+    yield component
+    children = getattr(component, "children", None)
+    if isinstance(children, (list, tuple)):
+        for child in children:
+            yield from _iter_components(child)
+    else:
+        yield from _iter_components(children)
+
+
+def _by_id(panel: Component) -> dict[str, Component]:
+    return {
+        component.id: component
+        for component in _iter_components(panel)
+        if getattr(component, "id", None) is not None
+    }
+
+
+def test_rpe_modal_has_apply_button() -> None:
+    ids = set(_by_id(rpe_modal()))
+
+    assert {"rpe-save", "rpe-apply", "rpe-cancel", "rpe-session-select"} <= ids
+
+
+def test_simulator_form_starts_empty() -> None:
+    components = _by_id(simulator_panel())
+
+    for component_id in ("sim-date", "sim-distance", "sim-pace", "sim-rpe"):
+        assert getattr(components[component_id], "value", None) is None
+
+
+def test_race_taper_form_starts_empty() -> None:
+    components = _by_id(race_taper_panel())
+
+    for component_id in (
+        "race-date",
+        "race-base-km",
+        "race-runs",
+        "race-pace",
+        "race-rpe",
+        "race-weeks",
+    ):
+        assert getattr(components[component_id], "value", None) is None

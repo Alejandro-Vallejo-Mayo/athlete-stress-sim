@@ -49,6 +49,30 @@ class BanisterSeriesResponse(BaseModel):
     freshness: list[float] = Field(default_factory=list)
 
 
+class CalibrationResponse(BaseModel):
+    """Calibrated Banister parameters and their validation (``RF-03.2``)."""
+
+    params: BanisterParams = Field(description="Effective parameters (calibrated or prior).")
+    priors: BanisterParams = Field(description="Reference priors used as the fallback.")
+    calibrated: bool = Field(description="Whether the fit passed the quality gate.")
+    observations: int = Field(ge=0, description="Number of observed performance points.")
+    r_squared: float | None = Field(
+        default=None, description="In-sample coefficient of determination of the fit."
+    )
+    baseline_efficiency: float | None = Field(
+        default=None, description="Median efficiency factor used to normalise observations."
+    )
+    cv_rmse: float | None = Field(
+        default=None, description="Leave-one-out RMSE of the calibrated model."
+    )
+    prior_cv_rmse: float | None = Field(
+        default=None, description="Leave-one-out RMSE of the prior-shaped baseline."
+    )
+    cv_improvement: float | None = Field(
+        default=None, description="Relative RMSE improvement over the prior baseline."
+    )
+
+
 class SimulationRequest(BaseModel):
     """Daily loads to simulate, with optional parameter overrides (``RF-05.2``)."""
 
@@ -112,4 +136,58 @@ class TaperSimulationResponse(BaseModel):
     history_end_index: int = Field(
         default=-1,
         description="Index of the last real (history) day, or -1 when there is no history.",
+    )
+
+
+class RunningBaselineResponse(BaseModel):
+    """Recent weekly running volume used as the taper starting point (``S14``)."""
+
+    weekly_km: float = Field(ge=0.0, description="Average weekly distance in kilometres.")
+    runs_per_week: int = Field(ge=1, description="Average number of runs per week.")
+    pace_min_per_km: float = Field(gt=0.0, description="Average pace in minutes per kilometre.")
+    rpe: float = Field(ge=0.0, le=10.0, description="Average session RPE.")
+    sessions: int = Field(ge=0, description="Number of sessions in the baseline window.")
+    weeks: int = Field(ge=1, description="Weeks covered by the baseline window.")
+
+
+class TaperWeekSummary(BaseModel):
+    """Weekly volume of a taper plan, oldest week first."""
+
+    start: date = Field(description="Monday that starts the week.")
+    factor: float = Field(gt=0.0, description="Fraction of the base weekly volume.")
+    distance_km: float = Field(ge=0.0, description="Planned distance in kilometres.")
+    sessions: int = Field(ge=0, description="Number of planned sessions.")
+
+
+class TaperPlanRequest(BaseModel):
+    """Inputs to generate a progressive pre-race taper (``RF-05.2``, ``S14``)."""
+
+    race_date: date
+    base_weekly_km: float = Field(gt=0.0, description="Current weekly running volume.")
+    pace_min_per_km: float = Field(gt=0.0, description="Planned pace in minutes per kilometre.")
+    runs_per_week: int = Field(default=3, ge=1, le=7, description="Running sessions per week.")
+    rpe: float = Field(default=6.0, ge=0.0, le=10.0, description="Planned session RPE.")
+    taper_weeks: int = Field(default=3, ge=1, le=8, description="Taper length in weeks.")
+    params: BanisterParams | None = Field(
+        default=None,
+        description="Override the physiological priors; defaults to ``/config/physiology``.",
+    )
+
+
+class TaperPlanResponse(BaseModel):
+    """Generated taper sessions and their projection up to race day."""
+
+    sessions: list[PlannedSession] = Field(default_factory=list)
+    weeks: list[TaperWeekSummary] = Field(default_factory=list)
+    simulation: TaperSimulationResponse = Field(default_factory=TaperSimulationResponse)
+    race_date: date
+    race_index: int = Field(ge=-1, description="Index of race day in the projection, or -1.")
+    race_freshness: float | None = Field(
+        default=None, description="Projected freshness on race morning."
+    )
+    peak_freshness_date: date | None = Field(
+        default=None, description="Day with the highest freshness inside the taper window."
+    )
+    peak_freshness: float | None = Field(
+        default=None, description="Highest freshness inside the taper window."
     )

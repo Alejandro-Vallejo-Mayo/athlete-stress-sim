@@ -12,12 +12,17 @@ _ACCENT_WIDTH = "6px"
 _DOT_SIZE = 96
 
 
-def status_panel(readiness: Readiness | None, freshness: float | None) -> dmc.Paper:
+def status_panel(
+    readiness: Readiness | None,
+    freshness: float | None,
+    percentile: float | None = None,
+) -> dmc.Paper:
     """Build the daily status card with the readiness traffic light.
 
     Args:
         readiness: Current readiness level, or ``None`` when there is no history.
         freshness: Current ``fitness - fatigue`` value, or ``None`` when there is no history.
+        percentile: Current freshness percentile in the recent history, if available.
 
     Returns:
         A full-height Mantine ``Paper`` card with a large readiness light on the
@@ -37,14 +42,21 @@ def status_panel(readiness: Readiness | None, freshness: float | None) -> dmc.Pa
             "flexShrink": 0,
         },
     )
-    details = dmc.Stack(
-        [
-            dmc.Text(meta.label, fw=700, size="xl"),
-            dmc.Text(meta.description, c="dimmed", size="sm"),
-            dmc.Text(f"Freshness: {freshness:+.1f} AU", fw=700, size="lg"),
-        ],
-        gap=4,
-    )
+    details: list[object] = [
+        dmc.Text(meta.label, fw=700, size="xl"),
+        dmc.Text(meta.description, c="dimmed", size="sm"),
+        dmc.Text(f"Freshness: {freshness:+.1f} AU", fw=700, size="lg"),
+    ]
+    if percentile is not None:
+        details.append(
+            dmc.Text(
+                f"Percentile of your recent history: P{percentile * 100:.0f}",
+                c="dimmed",
+                size="sm",
+            )
+        )
+    content = dmc.Group([light, dmc.Stack(details, gap=4)], gap="xl", align="center")
+    return _card(meta.color, content)
     content = dmc.Group([light, details], gap="xl", align="center")
     return _card(meta.color, content)
 

@@ -226,6 +226,17 @@ $$
 
 calculada por kilómetros para detectar fatiga cardiovascular durante las tiradas largas.
 
+### RF-05.4 (Predicción de Tiempo de Carrera)
+
+- Dada una distancia objetivo (5k, 10k, media maratón, maratón o personalizada), estimar el tiempo
+  de carrera a esfuerzo máximo.
+- Usar los mejores esfuerzos del historial (clasificados por %HRR y EF) y/o una carrera/test de
+  referencia introducido manualmente.
+- Modelos: Riegel y velocidad crítica, con selección automática, horquilla de tiempo y nivel de
+  confianza.
+- Ajustar la referencia por el cambio de fitness de Banister y no penalizar la predicción por el
+  ritmo de rodajes fáciles.
+
 # 4. Requisitos No Funcionales
 
 ### RNF-01 (Privacidad y Almacenamiento Local)

@@ -2,7 +2,7 @@
 
 Credentials are read from environment variables / a ``.env`` file (see
 ``.env.example``). Physiological values belong to the *user zero* and act as
-*priors* until the EKF tunes them (S9).
+*priors* until the calibration tunes the gains (S9, S14).
 """
 
 from __future__ import annotations
