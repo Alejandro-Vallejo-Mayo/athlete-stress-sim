@@ -12,12 +12,12 @@ WORKDIR /app
 
 # Dependencies layer (cacheable): just manifest files
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-install-project --all-groups
+RUN uv sync --frozen --no-install-project --no-dev
 
 # Application code
 COPY . .
-RUN uv sync --frozen --all-groups
+RUN uv sync --frozen --no-dev
 
 EXPOSE 8000
 
-CMD ["uv", "run", "uvicorn", "athlete_stress_sim.backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uv", "run", "--no-sync", "uvicorn", "athlete_stress_sim.backend.main:app", "--host", "0.0.0.0", "--port", "8000"]

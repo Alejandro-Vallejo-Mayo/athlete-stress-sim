@@ -10,10 +10,14 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   quality:
-    name: lint + typecheck + test
+    name: lint + typecheck + test + coverage
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -32,5 +36,5 @@ jobs:
       - name: Typecheck
         run: make typecheck
 
-      - name: Tests
-        run: make test
+      - name: Tests + coverage
+        run: make test-cov

@@ -26,7 +26,7 @@ from enum import StrEnum
 
 import numpy as np
 
-from athlete_stress_sim.core.etl.types import Sample
+from athlete_stress_sim.core.etl.types import SampleLike
 
 _METERS_PER_KM = 1000.0
 _MIN_POINTS = 2
@@ -217,7 +217,7 @@ def classify_effort(relative_hr: float | None) -> EffortTier:
 
 
 def best_effort(
-    samples: Sequence[Sample],
+    samples: Sequence[SampleLike],
     distance_m: float,
     day: date,
     *,
@@ -291,7 +291,7 @@ def best_effort(
 
 
 def select_best_efforts(
-    sessions: Sequence[tuple[date, Sequence[Sample]]],
+    sessions: Sequence[tuple[date, Sequence[SampleLike]]],
     distances_km: Sequence[float],
     *,
     hr_rest: float,
@@ -757,7 +757,7 @@ def _none(
 
 
 def _monotonic_points(
-    samples: Sequence[Sample],
+    samples: Sequence[SampleLike],
 ) -> list[tuple[float, float, int | None]]:
     """Return ``(distance_m, elapsed_s, hr)`` points with non-decreasing distance."""
     ordered = sorted(

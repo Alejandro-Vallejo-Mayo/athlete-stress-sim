@@ -42,13 +42,13 @@ def list_exercises(
 ) -> list[ExerciseOut]:
     """List persisted exercises, optionally only running or strength sessions."""
     result: list[ExerciseOut] = []
-    for exercise in store.list_exercises():
+    for exercise, rpe in store.list_exercises_with_rpe():
         strength = is_strength(exercise.sport, exercise.sub_sport)
         if kind == "gym" and not strength:
             continue
         if kind == "run" and strength:
             continue
-        result.append(_to_out(exercise, store.get_rpe(exercise.exercise_id)))
+        result.append(_to_out(exercise, rpe))
     return result
 
 

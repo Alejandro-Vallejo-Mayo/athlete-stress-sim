@@ -8,6 +8,7 @@ backend metrics API in a dark theme (``RNF-04``).
 
 from __future__ import annotations
 
+import os
 from datetime import date
 from typing import cast
 
@@ -593,4 +594,5 @@ server = app.server
 
 
 if __name__ == "__main__":  # pragma: no cover
-    app.run(debug=True, host="0.0.0.0", port=8050)
+    debug = os.environ.get("DASH_DEBUG", "true").lower() not in {"0", "false", "no"}
+    app.run(debug=debug, host="0.0.0.0", port=8050)

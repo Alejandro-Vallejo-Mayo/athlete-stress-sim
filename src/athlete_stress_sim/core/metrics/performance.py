@@ -13,11 +13,11 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 from datetime import date
 
-from athlete_stress_sim.core.etl.types import Sample
+from athlete_stress_sim.core.etl.types import SampleLike
 from athlete_stress_sim.core.metrics.decoupling import efficiency_factor
 
 
-def session_efficiency(samples: Sequence[Sample]) -> float | None:
+def session_efficiency(samples: Sequence[SampleLike]) -> float | None:
     """Return the mean efficiency factor ``speed / HR`` of a running session.
 
     Args:

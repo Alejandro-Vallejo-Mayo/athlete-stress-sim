@@ -167,6 +167,19 @@ def test_metrics_are_empty_without_history(tmp_path: Path) -> None:
     assert banister["freshness"] == []
 
 
+def test_metrics_refresh_after_rpe_edit(tmp_path: Path) -> None:
+    store = _seeded_store(tmp_path / "cache.duckdb")
+    client = _client_for(store)
+    try:
+        before = client.get("/metrics/acwr").json()["points"][-1]["chronic"]
+        store.set_rpe("gym1", 9.0)
+        after = client.get("/metrics/acwr").json()["points"][-1]["chronic"]
+    finally:
+        app.dependency_overrides.clear()
+
+    assert after != before
+
+
 def test_simulate_returns_trajectory(client: TestClient) -> None:
     response = client.post(
         "/simulate",
