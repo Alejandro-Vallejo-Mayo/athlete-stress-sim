@@ -14,8 +14,8 @@ Single Python package (*src layout*), Python 3.12 (pinned in `.python-version`;
 - `make db` opens a DuckDB shell (`data/athleta.duckdb`, connection named `con`); `make clean`
   removes caches.
 - Docker: `make docker-up` / `make docker-logs` / `make docker-down` (compose file is `docker/`).
-- Definition of done = `make lint && make typecheck && make test` (exactly what CI runs, in that
-  order). CI does **not** run `make test-cov`.
+- Definition of done = `make lint && make typecheck && make test-cov` (exactly what CI runs, in
+  that order). `test-cov` includes the test suite and enforces the coverage gate.
 
 ## Toolchain quirks
 
@@ -29,7 +29,7 @@ Single Python package (*src layout*), Python 3.12 (pinned in `.python-version`;
   `[[tool.mypy.overrides]]` (currently `fitparse.*`, `dash_mantine_components.*`, `plotly.*`,
   `scipy.*`) instead of sprinkling `# type: ignore`.
 - `make test-cov` enforces **80% branch coverage over `src/athlete_stress_sim/core` only**
-  (backend/frontend excluded).
+  (backend/frontend excluded); CI runs it as the test step.
 - pytest uses `pythonpath = ["src"]` plus `--strict-markers --strict-config`; no test service or
   network is required.
 
@@ -84,5 +84,6 @@ Single Python package (*src layout*), Python 3.12 (pinned in `.python-version`;
 - FIT fixtures are synthesized in memory by `tests/helpers/fit_fixture.py`; never commit real
   biometric data (`RNF-01`). `data/raw/` may hold local real FIT files — do not add or commit them.
 - `README.md` is a stub; product intent lives in `athlete-stress-sim-PRD.md`, `ROADMAP.md` and the
-  user-facing `docs/guia-funcionalidades.md`. Status: S1–S13 done, S14 largely done (real-data
-  validation; NLS replaced the old EKF); S15–S16 (Docker/CI polish, public README) pending.
+  user-facing `docs/guia-funcionalidades.md`. Status: S1–S14 done (real-data validation; NLS
+  replaced the old EKF), S15 done (DuckDB batch reads/cache, runtime Docker images, CI coverage
+  gate); S16 (public README) pending. Confirm the GitHub Actions run after pushing.

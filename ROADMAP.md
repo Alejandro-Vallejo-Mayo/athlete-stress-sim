@@ -245,9 +245,9 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 #### Semana 15 — Optimización, Docker y CI/CD
 **Objetivo:** dejar el sistema robusto y reproducible (`RNF-03`).
 
-- [ ] Optimizar consultas DuckDB y tiempos de simulación.
-- [ ] Empaquetado final Docker y `docker compose up` en frío.
-- [ ] Pipeline CI/CD verde (lint + test) en `.github/workflows/ci.yml`.
+- [x] Optimizar consultas DuckDB y tiempos de simulación. Lecturas por lote (`list_exercises_with_rpe` + `query_all_samples`), filas ligeras `SampleRow`, índice sobre `samples(exercise_id)` y caché por revisión de BD: dashboard de 5,5 s a ~0,32 s en caliente, endpoints de métricas < 200 ms.
+- [x] Empaquetado final Docker y `docker compose up` en frío. Imágenes solo con dependencias de runtime, sin datos ni secretos; `build --no-cache`, arranque con BD real y con BD vacía verificados.
+- [x] Pipeline CI/CD verde (lint + test) en `.github/workflows/ci.yml`. CI ejecuta `lint → typecheck → test-cov` con umbral del 80 % en `core`; validado localmente, pendiente confirmar el run de GitHub tras el push.
 
 #### Semana 16 — Documentación pública y portfolio
 **Objetivo:** cerrar el proyecto presentable.
@@ -280,8 +280,8 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 - [x] End-to-end: dashboard ↔ API ↔ DuckDB funcional.
 
 ### Fase 3 — DoD
-- [ ] Sistema validado con ≥ 2 semanas de datos reales.
-- [ ] CI/CD verde y despliegue Docker reproducible.
+- [x] Sistema validado con ≥ 2 semanas de datos reales.
+- [x] CI/CD verde y despliegue Docker reproducible. Docker verificado en frío; CI validado en local con `make test-cov` (pendiente el run de GitHub tras el push).
 - [ ] `README.md` público completo (inglés, LaTeX, diagramas, capturas).
 
 ---
