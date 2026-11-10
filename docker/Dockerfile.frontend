@@ -6,18 +6,19 @@ COPY --from=ghcr.io/astral-sh/uv:0.12.17 /uv /uvx /bin/
 
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    DASH_DEBUG=false
 
 WORKDIR /app
 
 # Dependencies layer (cacheable): just manifest files
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-install-project --all-groups
+RUN uv sync --frozen --no-install-project --no-dev
 
 # Application code
 COPY . .
-RUN uv sync --frozen --all-groups
+RUN uv sync --frozen --no-dev
 
 EXPOSE 8050
 
-CMD ["uv", "run", "python", "-m", "athlete_stress_sim.frontend.app"]
+CMD ["uv", "run", "--no-sync", "python", "-m", "athlete_stress_sim.frontend.app"]
