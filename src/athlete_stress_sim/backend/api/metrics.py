@@ -12,6 +12,8 @@ runs the Banister model forward over a caller-provided daily-load series, while
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Annotated
 
@@ -37,7 +39,7 @@ from athlete_stress_sim.backend.schemas.metrics import (
     TaperWeekSummary,
 )
 from athlete_stress_sim.core.etl.sports import is_strength
-from athlete_stress_sim.core.etl.types import Exercise
+from athlete_stress_sim.core.etl.types import Exercise, SampleLike
 from athlete_stress_sim.core.metrics.acwr import (
     DEFAULT_ACUTE_DAYS,
     DEFAULT_CHRONIC_DAYS,
@@ -70,6 +72,39 @@ simulate_router = APIRouter(tags=["simulation"])
 SessionStoreDep = Annotated[SessionStore, Depends(get_session_store)]
 
 
+@dataclass(frozen=True)
+class _SessionData:
+    """Exercises, their RPE and telemetry loaded from DuckDB in one batch."""
+
+    exercises: list[tuple[Exercise, float | None]]
+    samples: Mapping[str, Sequence[SampleLike]]
+
+
+_SESSION_DATA_CACHE: dict[str, tuple[tuple[str, int, int, int], _SessionData]] = {}
+_SESSION_DATA_CACHE_MAX = 8
+
+
+def _load_session_data(store: SessionStore) -> _SessionData:
+    """Load every exercise, RPE and sample with a constant number of queries.
+
+    The snapshot is cached per database file and invalidated by its revision
+    (mtime, size and the store's own write counter), so repeated dashboard calls
+    reuse it while RPE edits and syncs still produce fresh data.
+    """
+    revision = store.revision()
+    cached = _SESSION_DATA_CACHE.get(revision[0])
+    if cached is not None and cached[0] == revision:
+        return cached[1]
+    data = _SessionData(
+        exercises=store.list_exercises_with_rpe(),
+        samples=store.query_all_samples(),
+    )
+    if len(_SESSION_DATA_CACHE) >= _SESSION_DATA_CACHE_MAX:
+        _SESSION_DATA_CACHE.pop(next(iter(_SESSION_DATA_CACHE)))
+    _SESSION_DATA_CACHE[revision[0]] = (revision, data)
+    return data
+
+
 def _physiology_params() -> BanisterParams:
     """Build the Banister parameters from the active physiological priors."""
     return BanisterParams(
@@ -81,64 +116,69 @@ def _physiology_params() -> BanisterParams:
     )
 
 
-def _exercise_load(store: SessionStore, exercise: Exercise) -> float | None:
+def _exercise_load(
+    exercise: Exercise,
+    samples: Sequence[SampleLike],
+    rpe: float | None,
+) -> float | None:
     """Compute one exercise's internal load (TRIMP or session-RPE)."""
     hr_samples: list[int | None] | None
     if is_strength(exercise.sport, exercise.sub_sport):
         hr_samples = None
     else:
-        hr_samples = [sample.hr for sample in store.query_samples(exercise.exercise_id)]
+        hr_samples = [sample.hr for sample in samples]
     return session_load(
         exercise.sport,
         exercise.sub_sport,
         hr_samples=hr_samples,
         duration_s=exercise.duration_s,
-        rpe=store.get_rpe(exercise.exercise_id),
+        rpe=rpe,
         hr_rest=physiology.hr_rest,
         hr_max=physiology.hr_max,
         sex=physiology.sex,
     )
 
 
-def _assemble_daily_loads(store: SessionStore) -> list[tuple[date, float]]:
+def _assemble_daily_loads(data: _SessionData) -> list[tuple[date, float]]:
     """Collect every computable session load keyed by its calendar date."""
     dated_loads: list[tuple[date, float]] = []
-    for exercise in store.list_exercises():
+    for exercise, rpe in data.exercises:
         if exercise.start_time is None:
             continue
-        load = _exercise_load(store, exercise)
+        samples = data.samples.get(exercise.exercise_id, [])
+        load = _exercise_load(exercise, samples, rpe)
         if load is not None:
             dated_loads.append((exercise.start_time.date(), load))
     return dated_loads
 
 
-def _assemble_performance(store: SessionStore, dates: list[date]) -> dict[int, float]:
+def _assemble_performance(data: _SessionData, dates: list[date]) -> dict[int, float]:
     """Collect the efficiency factor of every running session keyed by day index."""
     sessions: list[tuple[date, float | None]] = []
-    for exercise in store.list_exercises():
+    for exercise, _ in data.exercises:
         if exercise.start_time is None or is_strength(exercise.sport, exercise.sub_sport):
             continue
-        efficiency = session_efficiency(store.query_samples(exercise.exercise_id))
-        sessions.append((exercise.start_time.date(), efficiency))
+        samples = data.samples.get(exercise.exercise_id, [])
+        sessions.append((exercise.start_time.date(), session_efficiency(samples)))
     return performance_observations(dates, sessions)
 
 
 def _calibration(
-    store: SessionStore,
+    data: _SessionData,
     dates: list[date],
     daily_loads: list[float],
 ) -> CalibrationResult:
     """Calibrate the Banister parameters against the observed performance."""
-    observations = _assemble_performance(store, dates)
+    observations = _assemble_performance(data, dates)
     return calibrate_banister(daily_loads, observations, _physiology_params())
 
 
 def _assemble_running_sessions(
-    store: SessionStore,
+    exercises: list[tuple[Exercise, float | None]],
 ) -> list[tuple[date, float, float | None, float | None]]:
     """Collect running sessions with distance, duration and RPE for the baseline."""
     sessions: list[tuple[date, float, float | None, float | None]] = []
-    for exercise in store.list_exercises():
+    for exercise, rpe in exercises:
         if exercise.start_time is None or is_strength(exercise.sport, exercise.sub_sport):
             continue
         if exercise.distance_m is None or exercise.distance_m <= 0.0:
@@ -148,7 +188,7 @@ def _assemble_running_sessions(
                 exercise.start_time.date(),
                 exercise.distance_m / 1000.0,
                 exercise.duration_s,
-                store.get_rpe(exercise.exercise_id),
+                rpe,
             )
         )
     return sessions
@@ -204,14 +244,19 @@ def get_session_trimp(exercise_id: str, store: SessionStoreDep) -> SessionLoadRe
         sport=exercise.sport,
         sub_sport=exercise.sub_sport,
         start_time=exercise.start_time,
-        load=_exercise_load(store, exercise),
+        load=_exercise_load(
+            exercise,
+            store.query_samples(exercise.exercise_id),
+            store.get_rpe(exercise.exercise_id),
+        ),
     )
 
 
 @router.get("/acwr")
 def get_acwr(store: SessionStoreDep) -> AcwrResponse:
     """Return the daily acute:chronic workload ratio series and risk zones."""
-    dates, values = daily_load_series(_assemble_daily_loads(store))
+    data = _load_session_data(store)
+    dates, values = daily_load_series(_assemble_daily_loads(data))
     acute = ewma_series(values, ewma_lambda(DEFAULT_ACUTE_DAYS))
     chronic = ewma_series(values, ewma_lambda(DEFAULT_CHRONIC_DAYS))
     ratios = acwr_series(values)
@@ -225,8 +270,9 @@ def get_acwr(store: SessionStoreDep) -> AcwrResponse:
 @router.get("/banister")
 def get_banister(store: SessionStoreDep) -> BanisterSeriesResponse:
     """Return the fitness-fatigue trajectory for the persisted training history."""
-    dates, values = daily_load_series(_assemble_daily_loads(store))
-    calibration = _calibration(store, dates, values)
+    data = _load_session_data(store)
+    dates, values = daily_load_series(_assemble_daily_loads(data))
+    calibration = _calibration(data, dates, values)
     result = impulse_response(values, calibration.params)
     return BanisterSeriesResponse(
         dates=dates,
@@ -241,8 +287,9 @@ def get_banister(store: SessionStoreDep) -> BanisterSeriesResponse:
 @router.get("/calibration")
 def get_calibration(store: SessionStoreDep) -> CalibrationResponse:
     """Return the calibrated Banister parameters and their validation."""
-    dates, values = daily_load_series(_assemble_daily_loads(store))
-    calibration = _calibration(store, dates, values)
+    data = _load_session_data(store)
+    dates, values = daily_load_series(_assemble_daily_loads(data))
+    calibration = _calibration(data, dates, values)
     return CalibrationResponse(
         params=calibration.params,
         priors=calibration.priors,
@@ -259,7 +306,7 @@ def get_calibration(store: SessionStoreDep) -> CalibrationResponse:
 @router.get("/running-baseline")
 def get_running_baseline(store: SessionStoreDep) -> RunningBaselineResponse | None:
     """Return the recent weekly running volume used to seed the taper form."""
-    sessions = _assemble_running_sessions(store)
+    sessions = _assemble_running_sessions(store.list_exercises_with_rpe())
     if not sessions:
         return None
     reference = max(session[0] for session in sessions) + timedelta(days=1)
@@ -315,8 +362,9 @@ def simulate_taper(
         )
         for session in payload.sessions
     ]
+    data = _load_session_data(store)
     return _taper_response(
-        _assemble_daily_loads(store),
+        _assemble_daily_loads(data),
         planned,
         payload.params or _physiology_params(),
     )
@@ -328,7 +376,8 @@ def plan_taper(
     store: SessionStoreDep,
 ) -> TaperPlanResponse:
     """Generate a progressive taper up to race day and project it over history."""
-    history = _assemble_daily_loads(store)
+    data = _load_session_data(store)
+    history = _assemble_daily_loads(data)
     if history and payload.race_date <= max(day for day, _ in history):
         raise HTTPException(
             status_code=422,

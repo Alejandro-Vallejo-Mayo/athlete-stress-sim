@@ -95,3 +95,34 @@ def test_rpe_roundtrip_and_overwrite(tmp_path: Path) -> None:
 
     store.set_rpe("abc", 5.0)
     assert store.get_rpe("abc") == 5.0
+
+
+def test_list_exercises_with_rpe_joins_the_recorded_value(tmp_path: Path) -> None:
+    store = SessionStore(tmp_path / "sessions.duckdb")
+    store.save_session("abc", _session(), "data/raw/abc.fit")
+
+    assert store.list_exercises_with_rpe()[0][1] is None
+
+    store.set_rpe("abc", 7.0)
+
+    exercises = store.list_exercises_with_rpe()
+    assert [exercise.exercise_id for exercise, _ in exercises] == ["abc"]
+    assert exercises[0][1] == 7.0
+
+
+def test_query_all_samples_groups_samples_by_exercise(tmp_path: Path) -> None:
+    store = SessionStore(tmp_path / "sessions.duckdb")
+    store.save_session("abc", _session(), "data/raw/abc.fit")
+    store.save_session("def", _session(), "data/raw/def.fit")
+
+    grouped = store.query_all_samples()
+
+    assert set(grouped) == {"abc", "def"}
+    assert [sample.hr for sample in grouped["abc"]] == [120, 122]
+    assert [sample.hr for sample in grouped["def"]] == [120, 122]
+
+
+def test_query_all_samples_is_empty_without_samples(tmp_path: Path) -> None:
+    store = SessionStore(tmp_path / "sessions.duckdb")
+
+    assert store.query_all_samples() == {}

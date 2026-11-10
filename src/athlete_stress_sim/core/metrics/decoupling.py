@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from athlete_stress_sim.core.etl.types import Sample
+from athlete_stress_sim.core.etl.types import SampleLike
 
 _METERS_PER_KM = 1000.0
 _MIN_KM_SEGMENTS = 2
@@ -32,7 +32,7 @@ def efficiency_factor(speed_mps: float | None, hr: int | None) -> float | None:
     return speed_mps / hr
 
 
-def per_km_efficiency(samples: Sequence[Sample]) -> list[float]:
+def per_km_efficiency(samples: Sequence[SampleLike]) -> list[float]:
     """Compute the efficiency factor for each completed kilometre.
 
     Samples are binned by their cumulative ``distance_m``; the EF of a kilometre
@@ -59,7 +59,7 @@ def per_km_efficiency(samples: Sequence[Sample]) -> list[float]:
     return [speed_sum[km] / hr_sum[km] for km in sorted(speed_sum) if hr_sum[km] > 0.0]
 
 
-def aerobic_decoupling(samples: Sequence[Sample]) -> float | None:
+def aerobic_decoupling(samples: Sequence[SampleLike]) -> float | None:
     """Return the aerobic decoupling percentage of a run.
 
     The per-kilometre efficiency factors are split in halves; the result is the

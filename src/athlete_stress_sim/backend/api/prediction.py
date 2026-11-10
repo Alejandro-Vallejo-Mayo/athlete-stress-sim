@@ -8,6 +8,7 @@ are used so an easy run is not mistaken for a slow race potential.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import replace
 from datetime import date, timedelta
 from typing import Annotated
@@ -15,7 +16,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from athlete_stress_sim.backend.api.ingest import get_session_store
-from athlete_stress_sim.backend.api.metrics import _assemble_daily_loads, _calibration
+from athlete_stress_sim.backend.api.metrics import (
+    _assemble_daily_loads,
+    _calibration,
+    _load_session_data,
+    _SessionData,
+)
 from athlete_stress_sim.backend.config import physiology
 from athlete_stress_sim.backend.schemas.prediction import (
     EffortOut,
@@ -24,7 +30,7 @@ from athlete_stress_sim.backend.schemas.prediction import (
     RaceReference,
 )
 from athlete_stress_sim.core.etl.sports import is_strength
-from athlete_stress_sim.core.etl.types import Sample
+from athlete_stress_sim.core.etl.types import SampleLike
 from athlete_stress_sim.core.metrics.load import daily_load_series
 from athlete_stress_sim.core.metrics.race_prediction import (
     Effort,
@@ -47,50 +53,48 @@ _MIN_FITNESS_FACTOR = 0.8
 _MAX_FITNESS_FACTOR = 1.2
 
 
-def _running_sessions(store: SessionStore) -> list[tuple[date, list[Sample]]]:
+def _running_sessions(data: _SessionData) -> list[tuple[date, Sequence[SampleLike]]]:
     """Collect recent running activities with their telemetry."""
     exercises = [
         exercise
-        for exercise in store.list_exercises()
+        for exercise, _ in data.exercises
         if exercise.start_time is not None and not is_strength(exercise.sport, exercise.sub_sport)
     ]
     if not exercises:
         return []
     latest = max(exercise.start_time for exercise in exercises if exercise.start_time is not None)
     cutoff = latest.date() - timedelta(days=_PREDICTION_WINDOW_DAYS)
-    sessions: list[tuple[date, list[Sample]]] = []
+    sessions: list[tuple[date, Sequence[SampleLike]]] = []
     for exercise in exercises:
         if exercise.start_time is None:
             continue
         day = exercise.start_time.date()
         if day < cutoff:
             continue
-        samples = store.query_samples(exercise.exercise_id)
+        samples = data.samples.get(exercise.exercise_id, [])
         if samples:
             sessions.append((day, samples))
     return sessions
 
 
-def _detected_efforts(store: SessionStore) -> list[Effort]:
-    """Return the best training effort per distance, fitness-adjusted."""
-    sessions = _running_sessions(store)
-    efforts = select_best_efforts(
-        sessions,
+def _detected_efforts(data: _SessionData) -> list[Effort]:
+    """Return the best training effort per distance for the given session data."""
+    return select_best_efforts(
+        _running_sessions(data),
         _DISTANCES_KM,
         hr_rest=physiology.hr_rest,
         hr_max=physiology.hr_max,
     )
-    return _fitness_adjusted(store, efforts)
 
 
-def _fitness_adjusted(store: SessionStore, efforts: list[Effort]) -> list[Effort]:
+def _fitness_adjusted(data: _SessionData, efforts: list[Effort]) -> list[Effort]:
     """Scale each effort's time to the current Banister fitness level."""
     if not efforts:
         return []
-    dates, values = daily_load_series(_assemble_daily_loads(store))
+    dates, values = daily_load_series(_assemble_daily_loads(data))
     if not dates:
         return efforts
-    calibration = _calibration(store, dates, values)
+    calibration = _calibration(data, dates, values)
     fitness = impulse_response(values, calibration.params).fitness
     if not fitness:
         return efforts
@@ -112,9 +116,9 @@ def _fitness_adjusted(store: SessionStore, efforts: list[Effort]) -> list[Effort
     return adjusted
 
 
-def _manual_effort(reference: RaceReference, store: SessionStore) -> Effort:
+def _manual_effort(reference: RaceReference) -> Effort:
     """Build a race-tier effort from the user-provided reference."""
-    effort = Effort(
+    return Effort(
         distance_km=reference.distance_km,
         time_s=reference.time_s,
         day=reference.day or date.today(),
@@ -124,7 +128,6 @@ def _manual_effort(reference: RaceReference, store: SessionStore) -> Effort:
         tier=EffortTier.RACE,
         source=EffortSource.MANUAL,
     )
-    return _fitness_adjusted(store, [effort])[0]
 
 
 def _to_out(effort: Effort) -> EffortOut:
@@ -158,7 +161,9 @@ def _to_response(prediction: RacePrediction) -> RacePredictionResponse:
 @router.get("/best-efforts")
 def get_best_efforts(store: SessionStoreDep) -> list[EffortOut]:
     """Return the best detected running effort for each reference distance."""
-    return [_to_out(effort) for effort in _detected_efforts(store)]
+    data = _load_session_data(store)
+    efforts = _fitness_adjusted(data, _detected_efforts(data))
+    return [_to_out(effort) for effort in efforts]
 
 
 @router.post("/race-prediction")
@@ -167,8 +172,13 @@ def predict_race_endpoint(
     store: SessionStoreDep,
 ) -> RacePredictionResponse:
     """Predict a race time from detected efforts and/or a manual reference."""
-    detected = _detected_efforts(store) if payload.use_detected_efforts else []
-    manual = _manual_effort(payload.reference, store) if payload.reference else None
+    data = _load_session_data(store)
+    detected = _detected_efforts(data) if payload.use_detected_efforts else []
+    manual = _manual_effort(payload.reference) if payload.reference else None
+    candidates = [*detected, *([manual] if manual is not None else [])]
+    adjusted = _fitness_adjusted(data, candidates)
+    detected = adjusted[: len(detected)]
+    manual = adjusted[len(detected)] if manual is not None else None
     prediction = predict_race(
         payload.distance_km,
         detected,

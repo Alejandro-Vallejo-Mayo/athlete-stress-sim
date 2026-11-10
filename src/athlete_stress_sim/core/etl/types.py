@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import NamedTuple, Protocol
 
 from pydantic import BaseModel, Field
 
@@ -29,6 +30,51 @@ class Sample(BaseModel):
     altitude_m: float | None = None
     distance_m: float | None = None
     is_valid: bool = True
+
+
+class SampleLike(Protocol):
+    """Structural type shared by parsed samples and lightweight storage rows."""
+
+    @property
+    def timestamp(self) -> datetime: ...
+
+    @property
+    def elapsed_s(self) -> float: ...
+
+    @property
+    def hr(self) -> int | None: ...
+
+    @property
+    def speed_mps(self) -> float | None: ...
+
+    @property
+    def cadence(self) -> int | None: ...
+
+    @property
+    def altitude_m(self) -> float | None: ...
+
+    @property
+    def distance_m(self) -> float | None: ...
+
+    @property
+    def is_valid(self) -> bool: ...
+
+
+class SampleRow(NamedTuple):
+    """Lightweight, unvalidated sample read from DuckDB.
+
+    Used by batch queries to avoid constructing thousands of Pydantic models;
+    it satisfies :class:`SampleLike`, so the metric helpers accept it directly.
+    """
+
+    timestamp: datetime
+    elapsed_s: float
+    hr: int | None
+    speed_mps: float | None
+    cadence: int | None
+    altitude_m: float | None
+    distance_m: float | None
+    is_valid: bool
 
 
 class SessionMetadata(BaseModel):

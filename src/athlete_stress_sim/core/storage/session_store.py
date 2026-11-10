@@ -12,7 +12,7 @@ from typing import Any
 
 import duckdb
 
-from athlete_stress_sim.core.etl.types import Exercise, ParsedSession, Sample
+from athlete_stress_sim.core.etl.types import Exercise, ParsedSession, SampleRow
 
 _ATHLETE_SCHEMA = """
 CREATE TABLE IF NOT EXISTS athlete (
@@ -75,7 +75,18 @@ class SessionStore:
     def __init__(self, db_path: Path | str) -> None:
         self._db_path = Path(db_path)
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._write_revision = 0
         self._ensure_schema()
+
+    def revision(self) -> tuple[str, int, int, int]:
+        """Return a key that changes whenever the database file is modified."""
+        stat = self._db_path.stat()
+        return (
+            str(self._db_path.resolve()),
+            stat.st_mtime_ns,
+            stat.st_size,
+            self._write_revision,
+        )
 
     def _connect(self) -> duckdb.DuckDBPyConnection:
         return duckdb.connect(str(self._db_path))
@@ -90,6 +101,9 @@ class SessionStore:
                 _RPE_SCHEMA,
             ):
                 connection.execute(statement)
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS samples_exercise_id_idx ON samples (exercise_id)"
+            )
         finally:
             connection.close()
 
@@ -103,6 +117,7 @@ class SessionStore:
             )
         finally:
             connection.close()
+        self._write_revision += 1
 
     def get_athlete(self) -> str | None:
         """Return the stored Polar user id, or ``None`` if no athlete row exists."""
@@ -173,6 +188,7 @@ class SessionStore:
                 )
         finally:
             connection.close()
+        self._write_revision += 1
 
     def list_exercises(self) -> list[Exercise]:
         """Return every persisted exercise, most recent first."""
@@ -186,6 +202,33 @@ class SessionStore:
         finally:
             connection.close()
         return [_row_to_exercise(row) for row in rows]
+
+    def list_exercises_with_rpe(self) -> list[tuple[Exercise, float | None]]:
+        """Return every persisted exercise with its session-RPE in one query.
+
+        Returns:
+            ``(exercise, rpe)`` pairs ordered by start time, most recent first.
+            ``rpe`` is ``None`` when the session has no recorded RPE.
+        """
+        connection = self._connect()
+        try:
+            rows = connection.execute(
+                "SELECT e.exercise_id, e.sport, e.sub_sport, e.start_time, e.duration_s, "
+                "e.distance_m, e.calories, e.avg_hr, e.max_hr, e.total_ascent_m, "
+                "e.total_descent_m, e.file_path, r.rpe "
+                "FROM exercises AS e "
+                "LEFT JOIN session_rpe AS r ON r.exercise_id = e.exercise_id "
+                "ORDER BY e.start_time DESC"
+            ).fetchall()
+        finally:
+            connection.close()
+        return [
+            (
+                _row_to_exercise(row[:12]),
+                float(row[12]) if row[12] is not None else None,
+            )
+            for row in rows
+        ]
 
     def get_exercise(self, exercise_id: str) -> Exercise | None:
         """Return one persisted exercise, or ``None`` if unknown."""
@@ -211,6 +254,7 @@ class SessionStore:
             )
         finally:
             connection.close()
+        self._write_revision += 1
 
     def get_rpe(self, exercise_id: str) -> float | None:
         """Return the stored session-RPE for an exercise, or ``None``."""
@@ -245,7 +289,7 @@ class SessionStore:
             connection.close()
         return int(row[0]) if row is not None else 0
 
-    def query_samples(self, exercise_id: str) -> list[Sample]:
+    def query_samples(self, exercise_id: str) -> list[SampleRow]:
         """Return the stored samples for an exercise, ordered by elapsed time."""
         connection = self._connect()
         try:
@@ -256,19 +300,40 @@ class SessionStore:
             ).fetchall()
         finally:
             connection.close()
-        return [
-            Sample(
-                timestamp=row[0],
-                elapsed_s=row[1],
-                hr=row[2],
-                speed_mps=row[3],
-                cadence=row[4],
-                altitude_m=row[5],
-                distance_m=row[6],
-                is_valid=row[7],
-            )
-            for row in rows
-        ]
+        return [_row_to_sample(row) for row in rows]
+
+    def query_all_samples(self) -> dict[str, list[SampleRow]]:
+        """Return every stored sample grouped by exercise in one query.
+
+        Returns:
+            A mapping from exercise id to its samples ordered by elapsed time.
+            Exercises without samples are absent from the mapping.
+        """
+        connection = self._connect()
+        try:
+            rows = connection.execute(
+                "SELECT exercise_id, ts, elapsed_s, hr, speed_mps, cadence, altitude_m, "
+                "distance_m, is_valid FROM samples ORDER BY exercise_id, elapsed_s"
+            ).fetchall()
+        finally:
+            connection.close()
+        grouped: dict[str, list[SampleRow]] = {}
+        for row in rows:
+            grouped.setdefault(str(row[0]), []).append(_row_to_sample(row[1:]))
+        return grouped
+
+
+def _row_to_sample(row: tuple[Any, ...]) -> SampleRow:
+    return SampleRow(
+        timestamp=row[0],
+        elapsed_s=row[1],
+        hr=row[2],
+        speed_mps=row[3],
+        cadence=row[4],
+        altitude_m=row[5],
+        distance_m=row[6],
+        is_valid=row[7],
+    )
 
 
 def _row_to_exercise(row: tuple[Any, ...]) -> Exercise:
