@@ -10,6 +10,7 @@ from dash import html
 
 from athlete_stress_sim.backend.schemas.prediction import EffortOut
 from athlete_stress_sim.core.metrics.race_prediction import format_duration
+from athlete_stress_sim.frontend.theme import surface_style
 
 HALF_MARATHON_KM = 21.0975
 """Default target distance in the race predictor."""
@@ -128,6 +129,7 @@ def race_predictor_panel() -> dmc.Paper:
                     ],
                     align="flex-end",
                     gap="sm",
+                    wrap="wrap",
                 ),
                 dmc.Text(
                     "The model is selected automatically (Riegel or critical speed).",
@@ -155,6 +157,7 @@ def race_predictor_panel() -> dmc.Paper:
                     ],
                     align="flex-end",
                     gap="sm",
+                    wrap="wrap",
                 ),
                 dmc.Button("Predict", id="race-predict", variant="filled", w=160),
                 dmc.Text(id="race-result-time", fw=700, size="xl"),
@@ -170,4 +173,5 @@ def race_predictor_panel() -> dmc.Paper:
         p="lg",
         radius="md",
         withBorder=True,
+        style=surface_style(),
     )

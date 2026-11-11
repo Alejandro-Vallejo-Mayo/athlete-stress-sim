@@ -5,6 +5,7 @@ from __future__ import annotations
 import dash_mantine_components as dmc
 
 from athlete_stress_sim.backend.schemas.exercises import ExerciseOut
+from athlete_stress_sim.frontend.theme import COLORS, surface_style
 
 _HIDDEN = {"display": "none"}
 _VISIBLE = {"display": "flex"}
@@ -53,6 +54,50 @@ def rpe_pending_children(count: int) -> object:
     )
 
 
+def rpe_pending_message(count: int) -> str:
+    """Describe how many gym sessions still need an RPE."""
+    if count == 0:
+        return "All gym sessions have RPE logged."
+    noun = "session" if count == 1 else "sessions"
+    verb = "needs" if count == 1 else "need"
+    return f"{count} gym {noun} {verb} an RPE. Load and ACWR may be underestimated."
+
+
+def rpe_pending_card() -> dmc.Paper:
+    """Build the Today card that surfaces pending gym RPE work."""
+    return dmc.Paper(
+        dmc.Stack(
+            [
+                dmc.Text(
+                    "Gym RPE",
+                    size="xs",
+                    fw=600,
+                    tt="uppercase",
+                    style={"color": COLORS["text_muted"], "letterSpacing": "0.08em"},
+                ),
+                dmc.Text(
+                    "Checking pending RPE...",
+                    id="rpe-pending-text",
+                    size="sm",
+                    style={"color": COLORS["text_muted"]},
+                ),
+                dmc.Button(
+                    "Review RPE",
+                    id="rpe-card-open",
+                    variant="light",
+                    size="xs",
+                    style={"display": "none"},
+                ),
+            ],
+            gap="sm",
+        ),
+        p="lg",
+        radius="md",
+        withBorder=True,
+        style=surface_style(),
+    )
+
+
 def rpe_modal() -> dmc.Modal:
     """Build the modal used to record a pending gym session's RPE."""
     return dmc.Modal(
@@ -81,14 +126,15 @@ def rpe_modal() -> dmc.Modal:
                     max=10.0,
                     step=0.5,
                 ),
-                dmc.Text(id="rpe-feedback", size="sm"),
+                dmc.Text(id="rpe-feedback", size="sm", **{"aria-live": "polite"}),
                 dmc.Group(
                     [
-                        dmc.Button("Save RPE", id="rpe-save", variant="filled"),
-                        dmc.Button("Apply", id="rpe-apply", variant="light"),
-                        dmc.Button("Close", id="rpe-cancel", variant="subtle"),
+                        dmc.Button("Save & next", id="rpe-save", variant="light"),
+                        dmc.Button("Save & close", id="rpe-apply", variant="filled"),
+                        dmc.Button("Cancel", id="rpe-cancel", variant="subtle"),
                     ],
                     justify="flex-end",
+                    wrap="wrap",
                 ),
             ],
             gap="sm",

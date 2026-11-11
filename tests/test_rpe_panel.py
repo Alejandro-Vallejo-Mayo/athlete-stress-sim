@@ -11,6 +11,8 @@ from athlete_stress_sim.backend.schemas.exercises import ExerciseOut
 from athlete_stress_sim.frontend.components.rpe import (
     pending_gym_sessions,
     rpe_modal,
+    rpe_pending_card,
+    rpe_pending_message,
     rpe_pending_style,
     rpe_session_options,
 )
@@ -110,3 +112,15 @@ def test_race_taper_form_starts_empty() -> None:
         "race-weeks",
     ):
         assert getattr(components[component_id], "value", None) is None
+
+
+def test_rpe_pending_message_describes_pending_count() -> None:
+    assert rpe_pending_message(0) == "All gym sessions have RPE logged."
+    assert rpe_pending_message(1).startswith("1 gym session needs")
+    assert "3 gym sessions" in rpe_pending_message(3)
+
+
+def test_rpe_pending_card_has_a_review_action() -> None:
+    ids = set(_by_id(rpe_pending_card()))
+
+    assert {"rpe-pending-text", "rpe-card-open"} <= ids

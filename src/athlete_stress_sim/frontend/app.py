@@ -30,13 +30,15 @@ from athlete_stress_sim.backend.schemas.prediction import (
 )
 from athlete_stress_sim.core.metrics.race_prediction import PredictionModel, format_duration
 from athlete_stress_sim.frontend.api import MetricsClient, MetricsClientError
-from athlete_stress_sim.frontend.components.acwr_gauge import build_acwr_gauge
+from athlete_stress_sim.frontend.components.acwr_gauge import acwr_risk_panel
 from athlete_stress_sim.frontend.components.decoupling import (
     build_decoupling_figure,
     decoupling_panel,
     decoupling_status_text,
 )
 from athlete_stress_sim.frontend.components.fitness_chart import build_fitness_figure
+from athlete_stress_sim.frontend.components.freshness_chart import freshness_panel
+from athlete_stress_sim.frontend.components.quick_stats import quick_stats_panel
 from athlete_stress_sim.frontend.components.race_predictor import (
     effort_rows,
     format_pace,
@@ -48,7 +50,9 @@ from athlete_stress_sim.frontend.components.race_predictor import (
 from athlete_stress_sim.frontend.components.rpe import (
     pending_gym_sessions,
     rpe_modal,
+    rpe_pending_card,
     rpe_pending_children,
+    rpe_pending_message,
     rpe_pending_style,
     rpe_session_options,
 )
@@ -62,8 +66,30 @@ from athlete_stress_sim.frontend.components.simulator import (
 )
 from athlete_stress_sim.frontend.components.status import status_panel
 from athlete_stress_sim.frontend.readiness import assess_readiness
+from athlete_stress_sim.frontend.theme import COLORS, MANTINE_THEME, surface_style
 
-DashboardOutputs = tuple[object, object, object, list[dict[str, str]], str | None]
+DashboardOutputs = tuple[
+    object,
+    object,
+    object,
+    object,
+    object,
+    list[dict[str, str]],
+    str | None,
+    object | None,
+]
+RefreshOutputs = tuple[
+    object,
+    object,
+    object,
+    object,
+    object,
+    list[dict[str, str]],
+    str | None,
+    int,
+    str,
+    object | None,
+]
 SessionOutputs = tuple[object, object, object, object, object, object, object]
 _MAX_RPE = 10.0
 
@@ -85,6 +111,36 @@ def _model_label(calibration: CalibrationResponse) -> str:
     return "priors (calibration not reliable)"
 
 
+def _no_data_alert() -> dmc.Alert:
+    """Explain how to populate an empty dashboard."""
+    return dmc.Alert(
+        "No training history yet. Sync Polar to populate load, recovery and risk.",
+        title="No data",
+        color="blue",
+        variant="light",
+    )
+
+
+def _offline_alert() -> dmc.Alert:
+    """Explain that the backend could not be reached."""
+    return dmc.Alert(
+        "The metrics API is unreachable. Start the backend and press Refresh.",
+        title="Backend offline",
+        color="red",
+        variant="light",
+    )
+
+
+def _sync_error_alert() -> dmc.Alert:
+    """Explain that the manual Polar sync failed."""
+    return dmc.Alert(
+        "Sync failed. Check the Polar connection and retry.",
+        title="Sync error",
+        color="orange",
+        variant="light",
+    )
+
+
 def _load_dashboard(client: MetricsClient, current_run: str | None) -> DashboardOutputs:
     """Fetch the metric series and the run list, keeping the current selection."""
     series = client.get_banister()
@@ -98,106 +154,250 @@ def _load_dashboard(client: MetricsClient, current_run: str | None) -> Dashboard
         panel = status_panel(None, None)
     valid = {option["value"] for option in options}
     selected = current_run if current_run in valid else (options[0]["value"] if options else None)
+    alert = _no_data_alert() if not series.dates and not points else None
     return (
         cast(object, panel),
         cast(object, build_fitness_figure(series)),
-        cast(object, build_acwr_gauge(points)),
+        cast(object, acwr_risk_panel(points)),
+        cast(object, freshness_panel(series)),
+        cast(object, quick_stats_panel(series, points)),
         options,
         selected,
+        alert,
     )
 
 
 def _empty_dashboard() -> DashboardOutputs:
-    """Placeholder panels shown when there is no data or the backend is offline."""
+    """Placeholder panels shown when the backend is offline."""
     return (
         cast(object, status_panel(None, None)),
         cast(object, build_fitness_figure(BanisterSeriesResponse())),
-        cast(object, build_acwr_gauge([])),
+        cast(object, acwr_risk_panel([])),
+        cast(object, freshness_panel(BanisterSeriesResponse())),
+        cast(object, quick_stats_panel(None, [])),
         [],
         None,
+        _offline_alert(),
+    )
+
+
+def _card(content: object) -> dmc.Paper:
+    """Wrap a panel or chart in the shared elevated surface."""
+    return dmc.Paper(
+        content,
+        p="lg",
+        radius="md",
+        withBorder=True,
+        style=surface_style(),
+    )
+
+
+def _header() -> dmc.AppShellHeader:
+    """Build the fixed application header with sync and RPE actions."""
+    return dmc.AppShellHeader(
+        dmc.Group(
+            [
+                dmc.Stack(
+                    [
+                        dmc.Title(
+                            "Athlete Stress Sim",
+                            order=1,
+                            size="h3",
+                            style={"color": COLORS["text"]},
+                        ),
+                        dmc.Text(
+                            "Training load and injury risk",
+                            size="xs",
+                            visibleFrom="sm",
+                            style={"color": COLORS["text_muted"]},
+                        ),
+                    ],
+                    gap=0,
+                ),
+                dmc.Group(
+                    [
+                        dmc.Button(
+                            id="rpe-pending-btn",
+                            variant="light",
+                            color="orange",
+                            size="xs",
+                            style={"display": "none"},
+                            children="RPE pending",
+                        ),
+                        dmc.Text(
+                            id="sync-status",
+                            size="xs",
+                            style={"color": COLORS["text_muted"]},
+                        ),
+                        dmc.Button("Refresh", id="refresh-btn", variant="light", size="xs"),
+                    ],
+                    gap="sm",
+                    align="center",
+                    wrap="wrap",
+                    justify="flex-end",
+                ),
+            ],
+            justify="space-between",
+            align="center",
+            h="100%",
+            px="md",
+        ),
+        style={
+            "backgroundColor": COLORS["surface"],
+            "borderBottom": f"1px solid {COLORS['border']}",
+        },
+    )
+
+
+def _today_tab() -> dmc.Stack:
+    """Build the today overview: readiness, load risk and freshness."""
+    return dmc.Stack(
+        [
+            html.Div(id="dashboard-alert"),
+            dmc.SimpleGrid(
+                [
+                    html.Div(
+                        status_panel(None, None),
+                        id="status-panel",
+                        style={"height": "100%"},
+                    ),
+                    html.Div(
+                        acwr_risk_panel([]),
+                        id="acwr-risk-panel",
+                        style={"height": "100%"},
+                    ),
+                ],
+                cols={"base": 1, "lg": 2},
+                spacing="md",
+                style={"alignItems": "stretch"},
+            ),
+            html.Div(quick_stats_panel(None, []), id="quick-stats"),
+            dmc.SimpleGrid(
+                [
+                    html.Div(
+                        freshness_panel(BanisterSeriesResponse()),
+                        id="freshness-panel",
+                    ),
+                    rpe_pending_card(),
+                ],
+                cols={"base": 1, "lg": 2},
+                spacing="md",
+                style={"alignItems": "stretch"},
+            ),
+        ],
+        gap="lg",
+    )
+
+
+def _trends_tab(initial_fitness: object) -> dmc.Stack:
+    """Build the historical view: fitness-fatigue and decoupling."""
+    return dmc.Stack(
+        [
+            _card(
+                dcc.Graph(
+                    id="fitness-chart",
+                    figure=initial_fitness,
+                    config={"displayModeBar": False, "responsive": True},
+                    style={"height": "420px"},
+                )
+            ),
+            decoupling_panel(),
+        ],
+        gap="lg",
+    )
+
+
+def _plan_tab() -> dmc.Stack:
+    """Build the planning tools: taper, simulator and race prediction."""
+    return dmc.Stack(
+        [
+            simulator_panel(),
+            race_taper_panel(),
+            race_predictor_panel(),
+        ],
+        gap="lg",
     )
 
 
 def create_app(client: MetricsClient | None = None) -> dash.Dash:
-    """Build and configure the Dash app with a dark, sporty aesthetic."""
+    """Build and configure the Dash app with a dark, performance-lab aesthetic."""
     metrics_client = client or MetricsClient()
 
     app = dash.Dash(__name__)
     app.title = "Athlete Stress Sim"
 
     initial_fitness = build_fitness_figure(BanisterSeriesResponse())
-    initial_gauge = build_acwr_gauge([])
 
     app.layout = dmc.MantineProvider(
         forceColorScheme="dark",
-        children=dmc.Container(
-            dmc.Stack(
-                [
-                    dmc.Group(
+        theme=MANTINE_THEME,
+        children=dmc.AppShell(
+            header={"height": 68},
+            padding="md",
+            children=[
+                _header(),
+                dmc.AppShellMain(
+                    dmc.Container(
                         [
-                            dmc.Title("Athlete Stress Sim", order=1),
-                            dmc.Group(
-                                [
-                                    dmc.Button(
-                                        id="rpe-pending-btn",
-                                        variant="light",
-                                        color="orange",
-                                        style={"display": "none"},
-                                        children="RPE pending",
-                                    ),
-                                    dmc.Text(id="sync-status", c="dimmed", size="xs"),
-                                    dmc.Button("Refresh", id="refresh-btn", variant="light"),
-                                ],
-                                gap="sm",
-                                align="center",
+                            dcc.Loading(
+                                type="circle",
+                                color=COLORS["primary"],
+                                children=dmc.Tabs(
+                                    value="today",
+                                    keepMounted=True,
+                                    variant="pills",
+                                    children=[
+                                        dmc.TabsList(
+                                            [
+                                                dmc.TabsTab("Today", value="today"),
+                                                dmc.TabsTab("Trends", value="trends"),
+                                                dmc.TabsTab("Plan", value="plan"),
+                                            ],
+                                            justify="left",
+                                        ),
+                                        dmc.TabsPanel(
+                                            _today_tab(),
+                                            value="today",
+                                            pt="md",
+                                        ),
+                                        dmc.TabsPanel(
+                                            _trends_tab(initial_fitness),
+                                            value="trends",
+                                            pt="md",
+                                        ),
+                                        dmc.TabsPanel(_plan_tab(), value="plan", pt="md"),
+                                    ],
+                                ),
                             ),
+                            rpe_modal(),
+                            dcc.Store(id="sim-sessions", data=[]),
+                            dcc.Store(id="data-refreshed", data=0),
+                            dcc.Store(id="rpe-refresh", data=0),
+                            dcc.Store(id="metric-refresh", data=0),
+                            dcc.Interval(id="init", interval=1, max_intervals=1),
                         ],
-                        justify="space-between",
+                        fluid=True,
+                        py="lg",
+                        mx="auto",
+                        style={"maxWidth": "1440px"},
                     ),
-                    dmc.SimpleGrid(
-                        [
-                            html.Div(
-                                status_panel(None, None),
-                                id="status-panel",
-                                style={"height": "100%"},
-                            ),
-                            dcc.Graph(
-                                id="acwr-gauge", figure=initial_gauge, style={"height": "320px"}
-                            ),
-                        ],
-                        cols={"base": 1, "md": 2},
-                        spacing="md",
-                        style={"alignItems": "stretch"},
-                    ),
-                    dcc.Graph(
-                        id="fitness-chart", figure=initial_fitness, style={"height": "420px"}
-                    ),
-                    decoupling_panel(),
-                    simulator_panel(),
-                    race_taper_panel(),
-                    race_predictor_panel(),
-                    rpe_modal(),
-                    dcc.Store(id="sim-sessions", data=[]),
-                    dcc.Store(id="data-refreshed", data=0),
-                    dcc.Store(id="rpe-refresh", data=0),
-                    dcc.Store(id="metric-refresh", data=0),
-                    dcc.Interval(id="init", interval=1, max_intervals=1),
-                ],
-                gap="md",
-                py="xl",
-            ),
-            fluid=True,
+                    style={"backgroundColor": COLORS["background"], "minHeight": "100vh"},
+                ),
+            ],
         ),
     )
 
     @app.callback(
         Output("status-panel", "children"),
         Output("fitness-chart", "figure"),
-        Output("acwr-gauge", "figure"),
+        Output("acwr-risk-panel", "children"),
+        Output("freshness-panel", "children"),
+        Output("quick-stats", "children"),
         Output("decoupling-run", "data"),
         Output("decoupling-run", "value"),
         Output("data-refreshed", "data"),
         Output("sync-status", "children"),
+        Output("dashboard-alert", "children"),
         Input("init", "n_intervals"),
         Input("refresh-btn", "n_clicks"),
         Input("metric-refresh", "data"),
@@ -210,7 +410,7 @@ def create_app(client: MetricsClient | None = None) -> dash.Dash:
         _metrics: int | None,
         current_run: str | None,
         refreshed: int | None,
-    ) -> tuple[object, object, object, list[dict[str, str]], str | None, int, str]:
+    ) -> RefreshOutputs:
         """Sync on manual refresh, then reload the dashboard panels."""
         sync_text = ""
         if ctx.triggered_id == "refresh-btn":
@@ -220,10 +420,25 @@ def create_app(client: MetricsClient | None = None) -> dash.Dash:
             except MetricsClientError:
                 sync_text = "Sync failed."
         try:
-            dashboard = _load_dashboard(metrics_client, current_run)
+            status, fitness, acwr, freshness, quick, options, selected, alert = _load_dashboard(
+                metrics_client, current_run
+            )
         except MetricsClientError:
-            dashboard = _empty_dashboard()
-        return (*dashboard, int(refreshed or 0) + 1, sync_text)
+            status, fitness, acwr, freshness, quick, options, selected, alert = _empty_dashboard()
+        if sync_text == "Sync failed.":
+            alert = _sync_error_alert()
+        return (
+            status,
+            fitness,
+            acwr,
+            freshness,
+            quick,
+            options,
+            selected,
+            int(refreshed or 0) + 1,
+            sync_text,
+            alert,
+        )
 
     @app.callback(
         Output("decoupling-chart", "figure"),
@@ -441,6 +656,8 @@ def _register_rpe_callbacks(app: dash.Dash, client: MetricsClient) -> None:
     @app.callback(
         Output("rpe-pending-btn", "style"),
         Output("rpe-pending-btn", "children"),
+        Output("rpe-pending-text", "children"),
+        Output("rpe-card-open", "style"),
         Output("rpe-session-select", "data"),
         Output("rpe-session-select", "value"),
         Input("data-refreshed", "data"),
@@ -449,18 +666,28 @@ def _register_rpe_callbacks(app: dash.Dash, client: MetricsClient) -> None:
     def load_pending_rpe(
         _refreshed: int | None,
         _saved: int | None,
-    ) -> tuple[dict[str, str], object, list[dict[str, str]], str | None]:
+    ) -> tuple[dict[str, str], object, str, dict[str, str], list[dict[str, str]], str | None]:
         """Show how many gym sessions are still missing an RPE."""
         try:
             exercises = client.get_exercises("gym")
         except MetricsClientError:
-            return (rpe_pending_style(0), "RPE pending", [], None)
+            return (
+                rpe_pending_style(0),
+                "RPE pending",
+                "RPE status unavailable.",
+                rpe_pending_style(0),
+                [],
+                None,
+            )
         pending = pending_gym_sessions(exercises)
         options = rpe_session_options(pending)
         value = options[0]["value"] if options else None
+        count = len(pending)
         return (
-            rpe_pending_style(len(pending)),
-            rpe_pending_children(len(pending)),
+            rpe_pending_style(count),
+            rpe_pending_children(count),
+            rpe_pending_message(count),
+            rpe_pending_style(count),
             options,
             value,
         )
@@ -472,6 +699,7 @@ def _register_rpe_callbacks(app: dash.Dash, client: MetricsClient) -> None:
         Output("rpe-refresh", "data"),
         Output("metric-refresh", "data"),
         Input("rpe-pending-btn", "n_clicks"),
+        Input("rpe-card-open", "n_clicks"),
         Input("rpe-save", "n_clicks"),
         Input("rpe-cancel", "n_clicks"),
         Input("rpe-apply", "n_clicks"),
@@ -483,6 +711,7 @@ def _register_rpe_callbacks(app: dash.Dash, client: MetricsClient) -> None:
     )
     def handle_rpe(  # noqa: PLR0911, PLR0917
         _open: int | None,
+        _card_open: int | None,
         _save: int | None,
         _cancel: int | None,
         _apply: int | None,
@@ -491,15 +720,13 @@ def _register_rpe_callbacks(app: dash.Dash, client: MetricsClient) -> None:
         counter: int | None,
         metrics: int | None,
     ) -> tuple[bool, str, float | None, int, int]:
-        """Open/close the modal, save RPEs and apply the recalculation."""
+        """Open/close the modal, save RPEs and refresh the dashboard."""
         current = counter or 0
         metrics_current = metrics or 0
-        if ctx.triggered_id == "rpe-pending-btn":
+        if ctx.triggered_id in {"rpe-pending-btn", "rpe-card-open"}:
             return (True, "", None, current, metrics_current)
         if ctx.triggered_id == "rpe-cancel":
             return (False, "", None, current, metrics_current)
-        if ctx.triggered_id == "rpe-apply":
-            return (False, "", None, current, metrics_current + 1)
         if exercise_id is None or rpe is None:
             return (True, "Select a session and enter an RPE.", None, current, metrics_current)
         if not 0.0 <= float(rpe) <= _MAX_RPE:
@@ -520,7 +747,9 @@ def _register_rpe_callbacks(app: dash.Dash, client: MetricsClient) -> None:
                 current,
                 metrics_current,
             )
-        return (True, "RPE saved.", None, current + 1, metrics_current)
+        if ctx.triggered_id == "rpe-apply":
+            return (False, "", None, current + 1, metrics_current + 1)
+        return (True, "RPE saved. Select the next session.", None, current + 1, metrics_current + 1)
 
 
 def _register_race_taper_callbacks(app: dash.Dash, client: MetricsClient) -> None:

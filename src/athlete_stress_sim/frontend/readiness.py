@@ -13,6 +13,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
+from athlete_stress_sim.frontend.theme import COLORS
+
 CAUTION_FLOOR = -5.0
 """Absolute freshness threshold used when there is not enough history (AU)."""
 
@@ -44,23 +46,27 @@ class ReadinessMeta:
     label: str
     color: str
     description: str
+    action: str
 
 
 READINESS_META: dict[Readiness, ReadinessMeta] = {
     Readiness.READY: ReadinessMeta(
         label="Ready",
-        color="green",
+        color=COLORS["ready"],
         description="Freshness is at or above your recent median; good for quality work.",
+        action="Good day for quality work. Keep the session controlled.",
     ),
     Readiness.CAUTION: ReadinessMeta(
         label="Caution",
-        color="yellow",
+        color=COLORS["caution"],
         description="Freshness is below your recent median; keep the intensity in check.",
+        action="Keep intensity in check and avoid adding load today.",
     ),
     Readiness.REST: ReadinessMeta(
         label="Rest",
-        color="red",
+        color=COLORS["rest"],
         description="Freshness is in the lowest part of your recent range; prioritise recovery.",
+        action="Prioritise recovery: easy movement or rest today.",
     ),
 }
 

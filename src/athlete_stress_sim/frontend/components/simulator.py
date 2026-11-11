@@ -9,12 +9,13 @@ import plotly.graph_objects as go
 from dash import dcc, html
 
 from athlete_stress_sim.backend.schemas.metrics import PlannedSession, TaperSimulationResponse
+from athlete_stress_sim.frontend.theme import COLORS, style_figure, surface_style
 
-_FITNESS_COLOR = "#4c6ef5"
-_FATIGUE_COLOR = "#fa5252"
-_FRESHNESS_COLOR = "#40c057"
+_FITNESS_COLOR = COLORS["fitness"]
+_FATIGUE_COLOR = COLORS["fatigue"]
+_FRESHNESS_COLOR = COLORS["freshness"]
 _NO_DATA_MESSAGE = "No data yet."
-_RACE_COLOR = "#fab005"
+_RACE_COLOR = COLORS["race"]
 
 SessionData = list[dict[str, object]]
 
@@ -108,7 +109,7 @@ def build_taper_figure(
         )
 
     if 0 <= split < len(labels) - 1:
-        figure.add_vline(x=labels[split], line_dash="dot", line_color="#868e96")
+        figure.add_vline(x=labels[split], line_dash="dot", line_color=COLORS["text_muted"])
     if race_date is not None and race_date in response.dates:
         race_label = labels[response.dates.index(race_date)]
         figure.add_vline(x=race_label, line_dash="dashdot", line_color=_RACE_COLOR)
@@ -162,18 +163,24 @@ def simulator_panel() -> dmc.Paper:
                     ],
                     align="flex-end",
                     gap="sm",
+                    wrap="wrap",
                 ),
                 dmc.Text(id="sim-form-status", c="red", size="sm"),
                 html.Div(id="sim-sessions-list"),
                 dmc.Button("Simulate", id="sim-run", variant="filled", w=160),
                 dmc.Text(id="sim-run-status", c="dimmed", size="sm"),
-                dcc.Graph(id="sim-chart", figure=build_taper_figure(TaperSimulationResponse())),
+                dcc.Graph(
+                    id="sim-chart",
+                    figure=build_taper_figure(TaperSimulationResponse()),
+                    config={"displayModeBar": False, "responsive": True},
+                ),
             ],
             gap="md",
         ),
         p="lg",
         radius="md",
         withBorder=True,
+        style=surface_style(),
     )
 
 
@@ -244,15 +251,21 @@ def race_taper_panel() -> dmc.Paper:
                     ],
                     align="flex-end",
                     gap="sm",
+                    wrap="wrap",
                 ),
                 dmc.Text(id="race-plan-status", c="dimmed", size="sm"),
-                dcc.Graph(id="race-chart", figure=build_taper_figure(TaperSimulationResponse())),
+                dcc.Graph(
+                    id="race-chart",
+                    figure=build_taper_figure(TaperSimulationResponse()),
+                    config={"displayModeBar": False, "responsive": True},
+                ),
             ],
             gap="md",
         ),
         p="lg",
         radius="md",
         withBorder=True,
+        style=surface_style(),
     )
 
 
@@ -276,24 +289,16 @@ def sessions_list(data: SessionData) -> dmc.Stack:
 def _empty_figure() -> go.Figure:
     figure = go.Figure()
     figure.add_annotation(
-        text=_NO_DATA_MESSAGE, showarrow=False, font={"size": 16, "color": "#868e96"}
+        text=_NO_DATA_MESSAGE,
+        showarrow=False,
+        font={"size": 16, "color": COLORS["text_muted"]},
     )
     return _style(figure, "Taper forecast")
 
 
 def _style(figure: go.Figure, title: str) -> go.Figure:
-    figure.update_layout(
-        template="plotly_dark",
+    return style_figure(
+        figure,
         title=title,
         margin={"l": 50, "r": 20, "t": 70, "b": 50},
-        legend={
-            "orientation": "h",
-            "yanchor": "bottom",
-            "y": 1.0,
-            "xanchor": "right",
-            "x": 1.0,
-        },
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
     )
-    return figure

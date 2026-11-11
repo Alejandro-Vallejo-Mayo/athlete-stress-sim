@@ -5,10 +5,11 @@ from __future__ import annotations
 import plotly.graph_objects as go
 
 from athlete_stress_sim.backend.schemas.metrics import BanisterSeriesResponse
+from athlete_stress_sim.frontend.theme import COLORS, style_figure
 
-_FITNESS_COLOR = "#4c6ef5"
-_FATIGUE_COLOR = "#fa5252"
-_FRESHNESS_COLOR = "#40c057"
+_FITNESS_COLOR = COLORS["fitness"]
+_FATIGUE_COLOR = COLORS["fatigue"]
+_FRESHNESS_COLOR = COLORS["freshness"]
 _NO_DATA_MESSAGE = "No data yet."
 
 
@@ -47,24 +48,16 @@ def build_fitness_figure(series: BanisterSeriesResponse) -> go.Figure:
 def _empty_figure() -> go.Figure:
     figure = go.Figure()
     figure.add_annotation(
-        text=_NO_DATA_MESSAGE, showarrow=False, font={"size": 16, "color": "#868e96"}
+        text=_NO_DATA_MESSAGE,
+        showarrow=False,
+        font={"size": 16, "color": COLORS["text_muted"]},
     )
     return _style(figure)
 
 
 def _style(figure: go.Figure) -> go.Figure:
-    figure.update_layout(
-        template="plotly_dark",
+    return style_figure(
+        figure,
         title="Fitness / Fatigue / Freshness",
         margin={"l": 50, "r": 20, "t": 70, "b": 50},
-        legend={
-            "orientation": "h",
-            "yanchor": "bottom",
-            "y": 1.0,
-            "xanchor": "right",
-            "x": 1.0,
-        },
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
     )
-    return figure

@@ -7,8 +7,9 @@ import plotly.graph_objects as go
 from dash import dcc
 
 from athlete_stress_sim.backend.schemas.metrics import DecouplingResponse
+from athlete_stress_sim.frontend.theme import COLORS, style_figure, surface_style
 
-_EF_COLOR = "#4dabf7"
+_EF_COLOR = COLORS["info"]
 _NO_DATA_MESSAGE = "No data yet."
 
 
@@ -57,6 +58,7 @@ def decoupling_panel() -> dmc.Paper:
                 dcc.Graph(
                     id="decoupling-chart",
                     figure=build_decoupling_figure(DecouplingResponse(exercise_id="")),
+                    config={"displayModeBar": False, "responsive": True},
                     style={"height": "340px"},
                 ),
             ],
@@ -65,23 +67,23 @@ def decoupling_panel() -> dmc.Paper:
         p="lg",
         radius="md",
         withBorder=True,
+        style=surface_style(),
     )
 
 
 def _empty_figure() -> go.Figure:
     figure = go.Figure()
     figure.add_annotation(
-        text=_NO_DATA_MESSAGE, showarrow=False, font={"size": 16, "color": "#868e96"}
+        text=_NO_DATA_MESSAGE,
+        showarrow=False,
+        font={"size": 16, "color": COLORS["text_muted"]},
     )
     return _style(figure)
 
 
 def _style(figure: go.Figure) -> go.Figure:
-    figure.update_layout(
-        template="plotly_dark",
+    return style_figure(
+        figure,
         title="Efficiency factor per kilometre",
         margin={"l": 50, "r": 20, "t": 60, "b": 50},
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
     )
-    return figure

@@ -60,9 +60,11 @@ Single Python package (*src layout*), Python 3.12 (pinned in `.python-version`;
   `performance`, `taper`,
   `race_prediction`; `core/models/` — `banister` (ODE) and `calibration` (bounded ridge
   least-squares with fixed `tau` + cross-validation gate; production path, **not** EKF).
-- `frontend/` — Dash + Mantine dashboard (dark theme); `app.py` builds on-demand callbacks,
-  `readiness.py` scores freshness, `api.py` fetches the backend over HTTP server-side (`API_URL`,
-  default `http://localhost:8000`; Docker compose sets `backend:8000`), panels live in `components/`.
+- `frontend/` — Dash + Mantine dashboard (dark theme); `app.py` uses an AppShell with
+  Today/Trends/Plan tabs and builds on-demand callbacks, `theme.py` holds the color/spacing tokens,
+  Mantine theme and shared Plotly layout, `readiness.py` scores freshness, `api.py` fetches the
+  backend over HTTP server-side (`API_URL`, default `http://localhost:8000`; Docker compose sets
+  `backend:8000`), panels live in `components/`.
 - Not strictly layered: `core/etl/` imports `backend.config` for Polar settings, `frontend/`
   imports `backend.schemas` and `core` types, and `api/prediction.py` reuses the private helpers
   `_assemble_daily_loads`/`_calibration` from `api/metrics.py`. Check that before moving modules.
