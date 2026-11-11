@@ -19,8 +19,8 @@ Polar AccessLink
       ▼
 DuckDB local (exercises, samples, session_rpe)
       │
-      ├─ Carrera  → TRIMP de Banister
-      └─ Fuerza   → session-RPE de Foster
+      ├─ Carrera / Elíptica → TRIMP de Banister (FC)
+      └─ Fuerza             → session-RPE de Foster
       │
       ▼
 Carga diaria (suma por día, días de descanso = 0)
@@ -34,6 +34,11 @@ FastAPI → Dashboard Dash/Mantine
 
 - **Carrera**: la carga se calcula con el TRIMP de Banister integrado sobre la frecuencia cardíaca
   segundo a segundo.
+- **Elíptica**: también usa el TRIMP de Banister sobre la FC, así que suma a la carga diaria, al
+  ACWR y al modelo de fitness-fatiga. No se usa en las métricas específicas de carrera (ritmo,
+  distancia, desacoplamiento, predicción ni taper), porque no son comparables. Polar puede
+  registrarla como `sport="training"` + `sub_sport="cardio_training"`; el clasificador la trata
+  como elíptica y no como gimnasio.
 - **Fuerza/gimnasio**: la carga se calcula con el session-RPE de Foster, `RPE × duración_min`. Para
   que cuente, la sesión debe tener un RPE registrado.
 - **Carga diaria**: se suman las cargas de todas las sesiones de un día. Los días sin sesión entre
@@ -341,7 +346,7 @@ La API expone las mismas métricas que consume el dashboard. La documentación i
 | `GET` | `/auth/refresh` | Renovar el token de acceso. |
 | `POST` | `/sync` | Descargar y parsear sesiones nuevas de Polar. |
 | `GET` | `/sync/status` | Contadores de ingesta y sesiones parseadas. |
-| `GET` | `/exercises?kind=all\|run\|gym` | Listar sesiones. |
+| `GET` | `/exercises?kind=all\|run\|gym\|elliptical` | Listar sesiones. |
 | `GET` | `/exercises/{id}` | Ver una sesión. |
 | `POST` | `/exercises/{id}/rpe` | Registrar el RPE de una sesión de fuerza. |
 | `GET` | `/metrics/trimp/{id}` | Carga interna de una sesión. |
@@ -359,9 +364,12 @@ La API expone las mismas métricas que consume el dashboard. La documentación i
 
 ## 11. Limitaciones que afectan a la interpretación
 
-- **Solo cuentan las sesiones con carga calculable**. Una sesión de fuerza sin RPE, o una carrera
-  sin muestras de FC, no aporta carga y puede hacer que el ACWR y las curvas subestimen el
+- **Solo cuentan las sesiones con carga calculable**. Una sesión de fuerza sin RPE, o una carrera o
+  elíptica sin muestras de FC, no aporta carga y puede hacer que el ACWR y las curvas subestimen el
   entrenamiento real. Si añades un RPE que faltaba, las métricas cambiarán.
+- **La elíptica cuenta como carga global, no como carrera**. Suma en ACWR y Banister, pero no
+  aparece en el selector de desacoplamiento, el baseline de carrera, la predicción de carrera ni
+  el plan de taper.
 - **El historial de Polar es limitado**. El cliente consulta el listado de ejercicios de los
   últimos 30 días; lo ya descargado permanece en DuckDB. La primera sincronización no reconstruye
   meses de pasado.

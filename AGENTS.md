@@ -52,10 +52,12 @@ Single Python package (*src layout*), Python 3.12 (pinned in `.python-version`;
   `/simulate/taper`, `/simulate/taper/plan`), `api/prediction.py` (`/metrics/best-efforts`,
   `/metrics/race-prediction`); request/response models live in `schemas/`. `/health` and
   `/config/physiology` (non-secret constants) are defined in `main.py`.
-- `core/etl/` — Polar OAuth2 client, catch-up sync, FIT parser, normalization.
+- `core/etl/` — Polar OAuth2 client, catch-up sync, FIT parser, normalization and
+  `sports.py` (activity classification: running, strength, elliptical, other).
 - `core/storage/` — DuckDB stores: `session_store` (tables `athlete`, `exercises`, `samples`,
   `session_rpe`), `ingest_store` (`ingest_log`), `token_store` (`oauth_tokens`).
-- `core/metrics/` — `trimp`, `rpe`, `acwr`, `load`, `decoupling`, `performance`, `taper`,
+- `core/metrics/` — `trimp` (running/elliptical), `rpe` (strength), `acwr`, `load`, `decoupling`,
+  `performance`, `taper`,
   `race_prediction`; `core/models/` — `banister` (ODE) and `calibration` (bounded ridge
   least-squares with fixed `tau` + cross-validation gate; production path, **not** EKF).
 - `frontend/` — Dash + Mantine dashboard (dark theme); `app.py` builds on-demand callbacks,

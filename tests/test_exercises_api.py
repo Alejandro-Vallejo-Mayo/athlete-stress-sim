@@ -36,6 +36,9 @@ def client(tmp_path: Path) -> Iterator[TestClient]:
     store.save_session(
         "gym1", _session("training", "strength_training", 3600.0), "data/raw/gym1.fit"
     )
+    store.save_session(
+        "elli1", _session("fitness_equipment", "elliptical", 2400.0), "data/raw/elli1.fit"
+    )
     app.dependency_overrides[get_session_store] = lambda: store
     yield TestClient(app)
     app.dependency_overrides.clear()
@@ -45,7 +48,7 @@ def test_list_all_exercises(client: TestClient) -> None:
     response = client.get("/exercises")
 
     assert response.status_code == 200
-    assert {item["exercise_id"] for item in response.json()} == {"run1", "gym1"}
+    assert {item["exercise_id"] for item in response.json()} == {"run1", "gym1", "elli1"}
 
 
 def test_list_only_gym_exercises(client: TestClient) -> None:
@@ -60,6 +63,19 @@ def test_list_only_running_exercises(client: TestClient) -> None:
 
     assert response.status_code == 200
     assert {item["exercise_id"] for item in response.json()} == {"run1"}
+
+
+def test_list_only_elliptical_exercises(client: TestClient) -> None:
+    response = client.get("/exercises", params={"kind": "elliptical"})
+
+    assert response.status_code == 200
+    assert {item["exercise_id"] for item in response.json()} == {"elli1"}
+
+
+def test_elliptical_is_not_listed_as_running(client: TestClient) -> None:
+    response = client.get("/exercises", params={"kind": "run"})
+
+    assert "elli1" not in {item["exercise_id"] for item in response.json()}
 
 
 def test_get_exercise(client: TestClient) -> None:

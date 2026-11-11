@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import Literal
 
 import httpx2
 from pydantic import TypeAdapter
@@ -65,7 +66,10 @@ class MetricsClient:
         """Fetch the daily acute:chronic workload ratio series from the backend."""
         return AcwrResponse.model_validate(self._get("/metrics/acwr"))
 
-    def get_exercises(self, kind: str = "run") -> list[ExerciseOut]:
+    def get_exercises(
+        self,
+        kind: Literal["all", "gym", "run", "elliptical"] = "run",
+    ) -> list[ExerciseOut]:
         """Fetch the persisted exercises, optionally filtered by ``kind``."""
         payload = self._get(f"/exercises?kind={kind}")
         return TypeAdapter(list[ExerciseOut]).validate_python(payload)

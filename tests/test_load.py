@@ -57,6 +57,20 @@ def test_running_session_uses_trimp() -> None:
     assert load == pytest.approx(31.8025, rel=1e-4)
 
 
+def test_elliptical_session_uses_trimp() -> None:
+    load = session_load(
+        "fitness_equipment",
+        "elliptical",
+        hr_samples=[130.0] * 1800,
+        duration_s=1800.0,
+        hr_rest=_HR_REST,
+        hr_max=_HR_MAX,
+        sex=Sex.MALE,
+    )
+
+    assert load == pytest.approx(31.8025, rel=1e-4)
+
+
 def test_endurance_session_without_samples_returns_none() -> None:
     load = session_load(
         "running",

@@ -237,6 +237,7 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 **Objetivo:** poner el sistema a trabajar con datos reales.
 
 - [x] Sincronizar al menos 2 semanas de datos reales (3 gym + 3 carrera). Verificado: 14 carrera + 11 gym (2026-10-03 → 2026-11-03), 11/11 gym con RPE.
+- [x] Soporte de elíptica como actividad de FC: carga por TRIMP en ACWR/Banister, excluida de baseline, taper, desacoplamiento y predicción de carrera; filtro `kind=elliptical` en `/exercises`.
 - [x] Validar parámetros EKF contra observaciones reales. Tras el estudio de calibración, producción usa NLS con `tau` fijo + ridge y gate por validación cruzada (`GET /metrics/calibration`, alias `/metrics/ekf`); con 13 observaciones reales no supera el gate y cae a priors.
 - [x] Ajustar tapering para las semanas previas a la Media Maratón. Implementado `POST /simulate/taper/plan` + panel `Race taper` (factores 0,75/0,55/0,35, baseline de 4 semanas); validado con datos reales, el freshness máximo cae el 2026-12-13.
 - [x] Predicción de tiempo de carrera (`RF-05.4`). Implementados `GET /metrics/best-efforts` y `POST /metrics/race-prediction` + panel `Race predictor` con Riegel, velocidad crítica, %HRR, EF, ajuste por fitness, horquilla y confianza.
@@ -270,7 +271,7 @@ S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacopla
 - [x] Tests de `src/athlete_stress_sim/core/etl` en verde.
 
 ### Fase 1 — DoD
-- [x] TRIMP (carrera y gym), ACWR, EDO Banister y calibración implementados y testeados (EKF sustituido por NLS en S14).
+- [x] TRIMP (carrera, elíptica y gym), ACWR, EDO Banister y calibración implementados y testeados (EKF sustituido por NLS en S14).
 - [x] Cobertura de `src/athlete_stress_sim/core` ≥ 80 %.
 - [x] Simulación EDO < 0.5 s.
 

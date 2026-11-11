@@ -74,6 +74,31 @@ def client(tmp_path: Path) -> Iterator[TestClient]:
     app.dependency_overrides.clear()
 
 
+def _elliptical_session() -> ParsedSession:
+    session = _run_session(_START, 5000.0, 1600.0)
+    session.metadata.sport = "fitness_equipment"
+    session.metadata.sub_sport = "elliptical"
+    return session
+
+
+def test_elliptical_sessions_are_ignored_by_running_efforts(tmp_path: Path) -> None:
+    store = SessionStore(tmp_path / "elliptical_prediction.duckdb")
+    store.save_session("elli1", _elliptical_session(), "data/raw/elli1.fit")
+    app.dependency_overrides[get_session_store] = lambda: store
+    client = TestClient(app)
+    try:
+        efforts = client.get("/metrics/best-efforts")
+        prediction = client.post(
+            "/metrics/race-prediction",
+            json={"distance_km": 10.0, "model": "auto"},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert efforts.json() == []
+    assert prediction.json()["predicted_time_s"] is None
+
+
 def test_best_efforts_detects_quality_efforts(client: TestClient) -> None:
     response = client.get("/metrics/best-efforts")
 
