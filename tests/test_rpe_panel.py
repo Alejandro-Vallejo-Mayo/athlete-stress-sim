@@ -16,6 +16,7 @@ from athlete_stress_sim.frontend.components.rpe import (
     rpe_pending_style,
     rpe_session_options,
 )
+from athlete_stress_sim.frontend.components.sessions import recent_sessions_panel
 from athlete_stress_sim.frontend.components.simulator import race_taper_panel, simulator_panel
 
 _START = datetime(2026, 10, 4, 18, 0, 0)
@@ -109,9 +110,9 @@ def test_race_taper_form_starts_empty() -> None:
         "race-runs",
         "race-pace",
         "race-rpe",
-        "race-weeks",
     ):
         assert getattr(components[component_id], "value", None) is None
+    assert components["race-weeks"].value == 3
 
 
 def test_rpe_pending_message_describes_pending_count() -> None:
@@ -124,3 +125,15 @@ def test_rpe_pending_card_has_a_review_action() -> None:
     ids = set(_by_id(rpe_pending_card()))
 
     assert {"rpe-pending-text", "rpe-card-open"} <= ids
+
+
+def test_recent_sessions_panel_has_review_action() -> None:
+    components = _by_id(recent_sessions_panel([_exercise("gym1"), _exercise("gym2", rpe=6.0)]))
+
+    assert components["sessions-rpe-open"].disabled is False
+
+
+def test_recent_sessions_panel_without_pending_disables_action() -> None:
+    components = _by_id(recent_sessions_panel([_exercise("gym1", rpe=6.0)]))
+
+    assert components["sessions-rpe-open"].disabled is True

@@ -429,13 +429,17 @@ def test_frontend_layout_has_three_tabs_and_shared_ids() -> None:
     }
 
     assert tabs and tabs[0].value == "today"
-    assert tab_values == {"today", "trends", "plan"}
+    assert {"today", "trends", "plan"} <= tab_values
+    assert {"taper", "simulator", "predictor"} <= tab_values
     assert {
         "status-panel",
         "acwr-risk-panel",
         "freshness-panel",
         "quick-stats",
+        "fitness-panel",
         "fitness-chart",
+        "recent-sessions",
+        "sessions-rpe-open",
         "refresh-btn",
         "rpe-pending-btn",
         "rpe-pending-text",

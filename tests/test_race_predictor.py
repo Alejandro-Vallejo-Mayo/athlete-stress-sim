@@ -101,7 +101,8 @@ def test_race_predictor_panel_defaults() -> None:
 
     assert components["race-distance-preset"].value == "half"
     assert components["race-distance-custom"].style == {"display": "none"}
-    assert "race-model" not in components
+    assert components["race-model"].value == "auto"
+    assert components["race-exponent"].value == pytest.approx(1.06)
     assert "race-predict" in components
     assert "race-result-time" in components
     assert "race-efforts-list" in components

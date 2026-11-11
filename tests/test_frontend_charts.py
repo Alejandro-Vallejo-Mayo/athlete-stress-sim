@@ -200,3 +200,10 @@ def test_fitness_figure_uses_theme_series_colors() -> None:
 def test_acwr_zone_metadata_uses_theme_colors() -> None:
     assert ZONE_META[RiskZone.DANGER].color == COLORS["danger"]
     assert ZONE_META[RiskZone.SWEET_SPOT].color == COLORS["ready"]
+
+
+def test_fitness_figure_has_range_selector() -> None:
+    figure = build_fitness_figure(_series())
+    labels = [button.label for button in figure.layout.xaxis.rangeselector.buttons]
+
+    assert labels == ["30d", "90d", "180d", "1y", "All"]

@@ -14,7 +14,7 @@ from typing import cast
 
 import dash
 import dash_mantine_components as dmc
-from dash import Input, Output, State, ctx, dcc, html
+from dash import Input, Output, State, ctx, dcc, html, no_update
 
 from athlete_stress_sim.backend.schemas.exercises import ExerciseOut
 from athlete_stress_sim.backend.schemas.metrics import (
@@ -34,9 +34,9 @@ from athlete_stress_sim.frontend.components.acwr_gauge import acwr_risk_panel
 from athlete_stress_sim.frontend.components.decoupling import (
     build_decoupling_figure,
     decoupling_panel,
-    decoupling_status_text,
+    decoupling_summary,
 )
-from athlete_stress_sim.frontend.components.fitness_chart import build_fitness_figure
+from athlete_stress_sim.frontend.components.fitness_chart import fitness_panel
 from athlete_stress_sim.frontend.components.freshness_chart import freshness_panel
 from athlete_stress_sim.frontend.components.quick_stats import quick_stats_panel
 from athlete_stress_sim.frontend.components.race_predictor import (
@@ -56,6 +56,7 @@ from athlete_stress_sim.frontend.components.rpe import (
     rpe_pending_style,
     rpe_session_options,
 )
+from athlete_stress_sim.frontend.components.sessions import recent_sessions_panel
 from athlete_stress_sim.frontend.components.simulator import (
     SessionData,
     build_taper_figure,
@@ -66,7 +67,7 @@ from athlete_stress_sim.frontend.components.simulator import (
 )
 from athlete_stress_sim.frontend.components.status import status_panel
 from athlete_stress_sim.frontend.readiness import assess_readiness
-from athlete_stress_sim.frontend.theme import COLORS, MANTINE_THEME, surface_style
+from athlete_stress_sim.frontend.theme import COLORS, MANTINE_THEME
 
 DashboardOutputs = tuple[
     object,
@@ -157,7 +158,7 @@ def _load_dashboard(client: MetricsClient, current_run: str | None) -> Dashboard
     alert = _no_data_alert() if not series.dates and not points else None
     return (
         cast(object, panel),
-        cast(object, build_fitness_figure(series)),
+        cast(object, fitness_panel(series)),
         cast(object, acwr_risk_panel(points)),
         cast(object, freshness_panel(series)),
         cast(object, quick_stats_panel(series, points)),
@@ -171,24 +172,13 @@ def _empty_dashboard() -> DashboardOutputs:
     """Placeholder panels shown when the backend is offline."""
     return (
         cast(object, status_panel(None, None)),
-        cast(object, build_fitness_figure(BanisterSeriesResponse())),
+        cast(object, fitness_panel(BanisterSeriesResponse())),
         cast(object, acwr_risk_panel([])),
         cast(object, freshness_panel(BanisterSeriesResponse())),
         cast(object, quick_stats_panel(None, [])),
         [],
         None,
         _offline_alert(),
-    )
-
-
-def _card(content: object) -> dmc.Paper:
-    """Wrap a panel or chart in the shared elevated surface."""
-    return dmc.Paper(
-        content,
-        p="lg",
-        radius="md",
-        withBorder=True,
-        style=surface_style(),
     )
 
 
@@ -289,33 +279,37 @@ def _today_tab() -> dmc.Stack:
     )
 
 
-def _trends_tab(initial_fitness: object) -> dmc.Stack:
-    """Build the historical view: fitness-fatigue and decoupling."""
+def _trends_tab() -> dmc.Stack:
+    """Build the historical view: training load, decoupling and sessions."""
     return dmc.Stack(
         [
-            _card(
-                dcc.Graph(
-                    id="fitness-chart",
-                    figure=initial_fitness,
-                    config={"displayModeBar": False, "responsive": True},
-                    style={"height": "420px"},
-                )
-            ),
+            html.Div(fitness_panel(BanisterSeriesResponse()), id="fitness-panel"),
             decoupling_panel(),
+            html.Div(recent_sessions_panel([]), id="recent-sessions"),
         ],
         gap="lg",
     )
 
 
-def _plan_tab() -> dmc.Stack:
-    """Build the planning tools: taper, simulator and race prediction."""
-    return dmc.Stack(
-        [
-            simulator_panel(),
-            race_taper_panel(),
-            race_predictor_panel(),
+def _plan_tab() -> dmc.Tabs:
+    """Build the planning tools under internal tabs."""
+    return dmc.Tabs(
+        value="taper",
+        keepMounted=True,
+        variant="pills",
+        children=[
+            dmc.TabsList(
+                [
+                    dmc.TabsTab("Race taper", value="taper"),
+                    dmc.TabsTab("What-if", value="simulator"),
+                    dmc.TabsTab("Race predictor", value="predictor"),
+                ],
+                justify="left",
+            ),
+            dmc.TabsPanel(race_taper_panel(), value="taper", pt="md"),
+            dmc.TabsPanel(simulator_panel(), value="simulator", pt="md"),
+            dmc.TabsPanel(race_predictor_panel(), value="predictor", pt="md"),
         ],
-        gap="lg",
     )
 
 
@@ -325,8 +319,6 @@ def create_app(client: MetricsClient | None = None) -> dash.Dash:
 
     app = dash.Dash(__name__)
     app.title = "Athlete Stress Sim"
-
-    initial_fitness = build_fitness_figure(BanisterSeriesResponse())
 
     app.layout = dmc.MantineProvider(
         forceColorScheme="dark",
@@ -361,7 +353,7 @@ def create_app(client: MetricsClient | None = None) -> dash.Dash:
                                             pt="md",
                                         ),
                                         dmc.TabsPanel(
-                                            _trends_tab(initial_fitness),
+                                            _trends_tab(),
                                             value="trends",
                                             pt="md",
                                         ),
@@ -389,7 +381,7 @@ def create_app(client: MetricsClient | None = None) -> dash.Dash:
 
     @app.callback(
         Output("status-panel", "children"),
-        Output("fitness-chart", "figure"),
+        Output("fitness-panel", "children"),
         Output("acwr-risk-panel", "children"),
         Output("freshness-panel", "children"),
         Output("quick-stats", "children"),
@@ -442,26 +434,28 @@ def create_app(client: MetricsClient | None = None) -> dash.Dash:
 
     @app.callback(
         Output("decoupling-chart", "figure"),
-        Output("decoupling-status", "children"),
+        Output("decoupling-summary", "children"),
         Input("decoupling-run", "value"),
     )
     def render_decoupling(exercise_id: str | None) -> tuple[object, object]:
-        """Render the per-kilometre efficiency of the selected run."""
+        """Render the per-kilometre efficiency and session summary of a run."""
         if exercise_id is None:
             return (
                 cast(object, build_decoupling_figure(DecouplingResponse(exercise_id=""))),
-                "No runs available.",
+                decoupling_summary(None),
             )
         try:
             response = metrics_client.get_decoupling(exercise_id)
+            exercises = metrics_client.get_exercises("run")
         except MetricsClientError:
             return (
                 cast(object, build_decoupling_figure(DecouplingResponse(exercise_id=exercise_id))),
-                "Backend offline.",
+                dmc.Text("Backend offline.", size="sm", style={"color": COLORS["text_muted"]}),
             )
+        exercise = next((item for item in exercises if item.exercise_id == exercise_id), None)
         return (
             cast(object, build_decoupling_figure(response)),
-            decoupling_status_text(response),
+            decoupling_summary(response, exercise),
         )
 
     @app.callback(
@@ -544,7 +538,44 @@ def create_app(client: MetricsClient | None = None) -> dash.Dash:
     _register_rpe_callbacks(app, metrics_client)
     _register_race_taper_callbacks(app, metrics_client)
     _register_race_predictor_callbacks(app, metrics_client)
+    _register_plan_prefill(app, metrics_client)
     return app
+
+
+def _register_plan_prefill(app: dash.Dash, client: MetricsClient) -> None:
+    """Prefill planning inputs from the recent running baseline on first load."""
+
+    @app.callback(
+        Output("race-base-km", "value"),
+        Output("race-runs", "value"),
+        Output("race-pace", "value"),
+        Output("race-rpe", "value"),
+        Output("sim-distance", "value"),
+        Output("sim-pace", "value"),
+        Output("sim-rpe", "value"),
+        Input("init", "n_intervals"),
+    )
+    def prefill_plan_inputs(_interval: int | None) -> tuple[object, ...]:
+        """Populate the plan forms with the athlete's recent running baseline."""
+        try:
+            baseline = client.get_running_baseline()
+        except MetricsClientError:
+            return (no_update,) * 7
+        if baseline is None:
+            return (no_update,) * 7
+        weekly_km = round(baseline.weekly_km, 1)
+        pace = round(baseline.pace_min_per_km, 1)
+        rpe = round(baseline.rpe, 1)
+        typical_km = max(1.0, round(weekly_km / baseline.runs_per_week, 1))
+        return (
+            weekly_km,
+            baseline.runs_per_week,
+            pace,
+            rpe,
+            typical_km,
+            pace,
+            rpe,
+        )
 
 
 def _register_race_predictor_callbacks(app: dash.Dash, client: MetricsClient) -> None:
@@ -582,6 +613,8 @@ def _register_race_predictor_callbacks(app: dash.Dash, client: MetricsClient) ->
         State("race-distance-custom", "value"),
         State("race-reference-distance", "value"),
         State("race-reference-minutes", "value"),
+        State("race-model", "value"),
+        State("race-exponent", "value"),
         prevent_initial_call=True,
     )
     def run_race_prediction(  # noqa: PLR0917
@@ -590,6 +623,8 @@ def _register_race_predictor_callbacks(app: dash.Dash, client: MetricsClient) ->
         custom_distance_km: object,
         reference_distance_km: object,
         reference_minutes: object,
+        model_value: str | None,
+        exponent_value: object,
     ) -> tuple[object, object, object, object, list[object], list[object]]:
         """Predict the race time and render the result and the efforts used."""
         target_distance = (
@@ -614,12 +649,15 @@ def _register_race_predictor_callbacks(app: dash.Dash, client: MetricsClient) ->
                 distance_km=reference_km,
                 time_s=reference_min * 60.0,
             )
+        model = PredictionModel(model_value) if model_value else PredictionModel.AUTO
+        exponent = optional_float(exponent_value) or 1.06
         try:
             prediction = client.predict_race(
                 RacePredictionRequest(
                     distance_km=target_distance,
-                    model=PredictionModel.AUTO,
+                    model=model,
                     reference=reference,
+                    exponent=exponent,
                 )
             )
         except (MetricsClientError, ValueError):
@@ -700,6 +738,7 @@ def _register_rpe_callbacks(app: dash.Dash, client: MetricsClient) -> None:
         Output("metric-refresh", "data"),
         Input("rpe-pending-btn", "n_clicks"),
         Input("rpe-card-open", "n_clicks"),
+        Input("sessions-rpe-open", "n_clicks"),
         Input("rpe-save", "n_clicks"),
         Input("rpe-cancel", "n_clicks"),
         Input("rpe-apply", "n_clicks"),
@@ -712,6 +751,7 @@ def _register_rpe_callbacks(app: dash.Dash, client: MetricsClient) -> None:
     def handle_rpe(  # noqa: PLR0911, PLR0917
         _open: int | None,
         _card_open: int | None,
+        _sessions_open: int | None,
         _save: int | None,
         _cancel: int | None,
         _apply: int | None,
@@ -723,7 +763,7 @@ def _register_rpe_callbacks(app: dash.Dash, client: MetricsClient) -> None:
         """Open/close the modal, save RPEs and refresh the dashboard."""
         current = counter or 0
         metrics_current = metrics or 0
-        if ctx.triggered_id in {"rpe-pending-btn", "rpe-card-open"}:
+        if ctx.triggered_id in {"rpe-pending-btn", "rpe-card-open", "sessions-rpe-open"}:
             return (True, "", None, current, metrics_current)
         if ctx.triggered_id == "rpe-cancel":
             return (False, "", None, current, metrics_current)
@@ -750,6 +790,18 @@ def _register_rpe_callbacks(app: dash.Dash, client: MetricsClient) -> None:
         if ctx.triggered_id == "rpe-apply":
             return (False, "", None, current + 1, metrics_current + 1)
         return (True, "RPE saved. Select the next session.", None, current + 1, metrics_current + 1)
+
+    @app.callback(
+        Output("recent-sessions", "children"),
+        Input("data-refreshed", "data"),
+    )
+    def load_recent_sessions(_refreshed: int | None) -> object:
+        """Load the latest sessions for the Trends view."""
+        try:
+            exercises = client.get_exercises("all")
+        except MetricsClientError:
+            exercises = []
+        return recent_sessions_panel(exercises)
 
 
 def _register_race_taper_callbacks(app: dash.Dash, client: MetricsClient) -> None:

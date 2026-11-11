@@ -125,54 +125,99 @@ def build_taper_figure(
 
 
 def simulator_panel() -> dmc.Paper:
-    """Build the tapering simulator form and forecast chart card."""
+    """Build the what-if simulator with a result-first layout."""
     return dmc.Paper(
         dmc.Stack(
             [
-                dmc.Text("Tapering simulator", fw=600, size="lg"),
-                dmc.Group(
+                dmc.Stack(
                     [
-                        dmc.DateInput(id="sim-date", label="Date", value=None, w=160),
-                        dmc.NumberInput(
-                            id="sim-distance",
-                            label="Distance (km)",
-                            min=0.1,
-                            step=1.0,
-                            value=None,
-                            w=150,
+                        dmc.Text(
+                            "What-if simulator",
+                            fw=600,
+                            size="lg",
+                            style={"color": COLORS["text"]},
                         ),
-                        dmc.NumberInput(
-                            id="sim-pace",
-                            label="Pace (min/km)",
-                            min=1.0,
-                            step=0.1,
-                            value=None,
-                            w=150,
+                        dmc.Text(
+                            "Add future sessions to see their impact on fitness, fatigue and form.",
+                            size="sm",
+                            style={"color": COLORS["text_muted"]},
                         ),
-                        dmc.NumberInput(
-                            id="sim-rpe",
-                            label="RPE (0-10)",
-                            min=0.0,
-                            max=10.0,
-                            step=0.5,
-                            value=None,
-                            w=150,
-                        ),
-                        dmc.Button("Add", id="sim-add", variant="light"),
-                        dmc.Button("Clear", id="sim-clear", variant="subtle"),
                     ],
-                    align="flex-end",
-                    gap="sm",
-                    wrap="wrap",
+                    gap=0,
                 ),
-                dmc.Text(id="sim-form-status", c="red", size="sm"),
-                html.Div(id="sim-sessions-list"),
-                dmc.Button("Simulate", id="sim-run", variant="filled", w=160),
-                dmc.Text(id="sim-run-status", c="dimmed", size="sm"),
                 dcc.Graph(
                     id="sim-chart",
                     figure=build_taper_figure(TaperSimulationResponse()),
                     config={"displayModeBar": False, "responsive": True},
+                    style={"height": "340px"},
+                ),
+                dmc.Text(id="sim-run-status", size="sm", style={"color": COLORS["text_muted"]}),
+                dmc.Accordion(
+                    [
+                        dmc.AccordionItem(
+                            [
+                                dmc.AccordionControl("Planned sessions"),
+                                dmc.AccordionPanel(
+                                    dmc.Stack(
+                                        [
+                                            dmc.Group(
+                                                [
+                                                    dmc.DateInput(
+                                                        id="sim-date",
+                                                        label="Date",
+                                                        value=None,
+                                                        w=160,
+                                                    ),
+                                                    dmc.NumberInput(
+                                                        id="sim-distance",
+                                                        label="Distance (km)",
+                                                        min=0.1,
+                                                        step=1.0,
+                                                        value=None,
+                                                        w=150,
+                                                    ),
+                                                    dmc.NumberInput(
+                                                        id="sim-pace",
+                                                        label="Pace (min/km)",
+                                                        min=1.0,
+                                                        step=0.1,
+                                                        value=None,
+                                                        w=150,
+                                                    ),
+                                                    dmc.NumberInput(
+                                                        id="sim-rpe",
+                                                        label="RPE (0-10)",
+                                                        min=0.0,
+                                                        max=10.0,
+                                                        step=0.5,
+                                                        value=None,
+                                                        w=150,
+                                                    ),
+                                                    dmc.Button(
+                                                        "Add", id="sim-add", variant="light"
+                                                    ),
+                                                    dmc.Button(
+                                                        "Clear", id="sim-clear", variant="subtle"
+                                                    ),
+                                                ],
+                                                align="flex-end",
+                                                gap="sm",
+                                                wrap="wrap",
+                                            ),
+                                            dmc.Text(id="sim-form-status", c="red", size="sm"),
+                                            html.Div(id="sim-sessions-list"),
+                                            dmc.Button(
+                                                "Simulate", id="sim-run", variant="filled", w=160
+                                            ),
+                                        ],
+                                        gap="md",
+                                    )
+                                ),
+                            ],
+                            value="sessions",
+                        )
+                    ],
+                    value="sessions",
                 ),
             ],
             gap="md",
@@ -185,79 +230,123 @@ def simulator_panel() -> dmc.Paper:
 
 
 def race_taper_panel() -> dmc.Paper:
-    """Build the race-aware taper planner form and forecast chart card."""
+    """Build the race-aware taper planner with a result-first layout."""
     return dmc.Paper(
         dmc.Stack(
             [
-                dmc.Text("Race taper", fw=600, size="lg"),
-                dmc.Text(
-                    "Reduce volume over the final weeks while keeping pace and RPE; "
-                    "the projection runs up to race morning.",
-                    c="dimmed",
-                    size="sm",
-                ),
-                dmc.Group(
+                dmc.Stack(
                     [
-                        dmc.DateInput(
-                            id="race-date",
-                            label="Race date",
-                            value=None,
-                            w=160,
+                        dmc.Text(
+                            "Race taper",
+                            fw=600,
+                            size="lg",
+                            style={"color": COLORS["text"]},
                         ),
-                        dmc.NumberInput(
-                            id="race-base-km",
-                            label="Weekly km",
-                            min=1.0,
-                            step=1.0,
-                            value=None,
-                            w=140,
+                        dmc.Text(
+                            "Reduce volume over the final weeks while keeping pace and RPE; "
+                            "the projection runs up to race morning.",
+                            size="sm",
+                            style={"color": COLORS["text_muted"]},
                         ),
-                        dmc.NumberInput(
-                            id="race-runs",
-                            label="Runs/week",
-                            min=1,
-                            max=7,
-                            step=1,
-                            value=None,
-                            w=130,
-                        ),
-                        dmc.NumberInput(
-                            id="race-pace",
-                            label="Pace (min/km)",
-                            min=1.0,
-                            step=0.1,
-                            value=None,
-                            w=150,
-                        ),
-                        dmc.NumberInput(
-                            id="race-rpe",
-                            label="RPE (0-10)",
-                            min=0.0,
-                            max=10.0,
-                            step=0.5,
-                            value=None,
-                            w=130,
-                        ),
-                        dmc.NumberInput(
-                            id="race-weeks",
-                            label="Taper weeks",
-                            min=1,
-                            max=8,
-                            step=1,
-                            value=None,
-                            w=140,
-                        ),
-                        dmc.Button("Plan taper", id="race-run", variant="filled"),
                     ],
-                    align="flex-end",
-                    gap="sm",
-                    wrap="wrap",
+                    gap=0,
                 ),
-                dmc.Text(id="race-plan-status", c="dimmed", size="sm"),
+                dmc.Text(
+                    "Set your race date and baseline to generate a taper plan.",
+                    id="race-plan-status",
+                    size="sm",
+                    style={"color": COLORS["text_muted"]},
+                ),
                 dcc.Graph(
                     id="race-chart",
                     figure=build_taper_figure(TaperSimulationResponse()),
                     config={"displayModeBar": False, "responsive": True},
+                    style={"height": "340px"},
+                ),
+                dmc.Accordion(
+                    [
+                        dmc.AccordionItem(
+                            [
+                                dmc.AccordionControl("Plan inputs"),
+                                dmc.AccordionPanel(
+                                    dmc.Stack(
+                                        [
+                                            dmc.Group(
+                                                [
+                                                    dmc.DateInput(
+                                                        id="race-date",
+                                                        label="Race date",
+                                                        value=None,
+                                                        w=160,
+                                                    ),
+                                                    dmc.NumberInput(
+                                                        id="race-base-km",
+                                                        label="Weekly km",
+                                                        min=1.0,
+                                                        step=1.0,
+                                                        value=None,
+                                                        w=140,
+                                                    ),
+                                                    dmc.NumberInput(
+                                                        id="race-runs",
+                                                        label="Runs/week",
+                                                        min=1,
+                                                        max=7,
+                                                        step=1,
+                                                        value=None,
+                                                        w=130,
+                                                    ),
+                                                    dmc.NumberInput(
+                                                        id="race-pace",
+                                                        label="Pace (min/km)",
+                                                        min=1.0,
+                                                        step=0.1,
+                                                        value=None,
+                                                        w=150,
+                                                    ),
+                                                    dmc.NumberInput(
+                                                        id="race-rpe",
+                                                        label="RPE (0-10)",
+                                                        min=0.0,
+                                                        max=10.0,
+                                                        step=0.5,
+                                                        value=None,
+                                                        w=130,
+                                                    ),
+                                                    dmc.NumberInput(
+                                                        id="race-weeks",
+                                                        label="Taper weeks",
+                                                        min=1,
+                                                        max=8,
+                                                        step=1,
+                                                        value=3,
+                                                        w=140,
+                                                    ),
+                                                    dmc.Button(
+                                                        "Plan taper",
+                                                        id="race-run",
+                                                        variant="filled",
+                                                    ),
+                                                ],
+                                                align="flex-end",
+                                                gap="sm",
+                                                wrap="wrap",
+                                            ),
+                                            dmc.Text(
+                                                "Baseline values are prefilled from your recent "
+                                                "running volume when available.",
+                                                size="xs",
+                                                style={"color": COLORS["text_muted"]},
+                                            ),
+                                        ],
+                                        gap="sm",
+                                    )
+                                ),
+                            ],
+                            value="inputs",
+                        )
+                    ],
+                    value="inputs",
                 ),
             ],
             gap="md",
