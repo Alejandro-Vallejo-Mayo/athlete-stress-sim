@@ -388,7 +388,7 @@ NLS with fixed `tau` + ridge and a CV gate; kept as a historical reference.*
   - [ ] Real dashboard captures.
 - [x] Translate the PRD to English and update it to the as-built state.
 - [x] Translate the roadmap to English and update it to the as-built state.
-- [~] Translate and update the user guide to English.
+- [x] Translate and update the user guide to English.
 - [ ] Write the technical deep dives: `architecture.md`, `mathematical-model.md`
   and `validation.md`.
 - [ ] Review exposed credentials and clean up secrets.

@@ -35,9 +35,9 @@ Single Python package (*src layout*), Python 3.12 (pinned in `.python-version`;
 
 ## Conventions
 
-- Load the `python-conventions` skill before writing/reviewing Python. All code artifacts
-  (identifiers, comments, docstrings, commit/branch names, build/config comments) are **English**;
-  `docs/product-requirements.md`, `docs/roadmap.md` and `docs/user-guide.md` are Spanish and exempt.
+- Load the `python-conventions` skill before writing/reviewing Python. All code and documentation
+  artifacts (identifiers, comments, docstrings, commit/branch names, build/config comments and
+  public docs) are **English**; public documentation lives under `docs/`.
 - PEP 257 docstrings (Google-style `Args`/`Returns`/`Raises`). Reference PRD requirement IDs
   (`RF-xx`/`RNF-xx`) and sprint tags (`S1`–`S16`) where relevant.
 - Conventional commits (`feat:`, `refactor:`, ...). CI triggers on `main`/`develop`/`feature/**`

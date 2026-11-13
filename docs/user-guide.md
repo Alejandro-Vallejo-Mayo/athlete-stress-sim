@@ -1,390 +1,721 @@
-# Guía funcional y de interpretación del dashboard
+# User Guide — Dashboard and Metric Interpretation
 
-Esta guía explica qué calcula **Athlete Stress Sim**, qué representa cada panel del dashboard y
-cómo leer sus gráficas. Está pensada para usar la aplicación, no para sustituir al
-[PRD](product-requirements.md) ni al [ROADMAP](roadmap.md), que son la referencia de
-producto y planificación.
+> **Version:** 1.1.0 · **Status:** Final · **Last updated:** 2026-11-13
+>
+> This guide explains what Athlete Stress Sim calculates, what each dashboard
+> panel represents and how to read its charts. It is written for using the
+> application, not for replacing the [PRD](product-requirements.md) or the
+> [roadmap](roadmap.md), which are the product and planning references.
+>
+> **This is not medical advice.** The metrics are estimates of internal load and
+> fatigue. Use them to detect trends, not to diagnose injuries or replace a
+> professional assessment.
 
-> No es consejo médico. Las métricas son estimaciones de carga interna y fatiga; úsalas para
-> detectar tendencias, no para diagnosticar lesiones ni sustituir la valoración de un profesional.
+---
 
-## 1. Qué hace la aplicación
+## Table of contents
 
-La aplicación convierte las sesiones de Polar en una serie diaria de carga y la usa para estimar
-fitness, fatiga y riesgo de sobrecarga:
+1. [What the application does](#1-what-the-application-does)
+2. [Quick start](#2-quick-start)
+3. [Sync, RPE and data corrections](#3-sync-rpe-and-data-corrections)
+4. [Dashboard map](#4-dashboard-map)
+5. [Today](#5-today)
+6. [Trends](#6-trends)
+7. [Plan](#7-plan)
+8. [Metric definitions and formulas](#8-metric-definitions-and-formulas)
+9. [Configuration reference](#9-configuration-reference)
+10. [API endpoints](#10-api-endpoints)
+11. [Troubleshooting](#11-troubleshooting)
+12. [Limitations and interpretation](#12-limitations-and-interpretation)
+
+---
+
+## 1. What the application does
+
+Athlete Stress Sim turns Polar training sessions into a daily load series and
+uses that series to estimate fitness, fatigue and overload risk:
 
 ```text
 Polar AccessLink
-      │  descarga FIT
+      │  FIT download
       ▼
-DuckDB local (exercises, samples, session_rpe)
+Local DuckDB (exercises, samples, session_rpe)
       │
-      ├─ Carrera / Elíptica → TRIMP de Banister (FC)
-      └─ Fuerza             → session-RPE de Foster
-      │
-      ▼
-Carga diaria (suma por día, días de descanso = 0)
-      │
-      ├─ ACWR (EWMA aguda 7 d / crónica 28 d)
-      └─ Modelo Banister (fitness, fatiga, freshness)
+      ├─ Running / elliptical → Banister TRIMP (heart rate)
+      └─ Strength             → Foster session-RPE
       │
       ▼
-FastAPI → Dashboard Dash/Mantine
+Daily load (sum per day; rest days = 0)
+      │
+      ├─ ACWR (7-day acute / 28-day chronic EWMA)
+      └─ Banister model (fitness, fatigue, freshness)
+      │
+      ▼
+FastAPI → Dash/Mantine dashboard
 ```
 
-- **Carrera**: la carga se calcula con el TRIMP de Banister integrado sobre la frecuencia cardíaca
-  segundo a segundo.
-- **Elíptica**: también usa el TRIMP de Banister sobre la FC, así que suma a la carga diaria, al
-  ACWR y al modelo de fitness-fatiga. No se usa en las métricas específicas de carrera (ritmo,
-  distancia, desacoplamiento, predicción ni taper), porque no son comparables. Polar puede
-  registrarla como `sport="training"` + `sub_sport="cardio_training"`; el clasificador la trata
-  como elíptica y no como gimnasio.
-- **Fuerza/gimnasio**: la carga se calcula con el session-RPE de Foster, `RPE × duración_min`. Para
-  que cuente, la sesión debe tener un RPE registrado.
-- **Carga diaria**: se suman las cargas de todas las sesiones de un día. Los días sin sesión entre
-  la primera y la última fecha se rellenan con `0` para que la fatiga pueda decaer.
-- **Unidades**: ambas cargas se expresan en unidades arbitrarias (AU) y el proyecto las trata como
-  una escala común. No son magnitudes fisiológicas idénticas: sirven para comparar tendencias, no
-  para comparar el valor absoluto de una sesión de fuerza con el de una carrera.
+- **Running:** load is calculated with Banister TRIMP integrated over the
+  second-by-second heart-rate series.
+- **Elliptical:** also uses heart-rate TRIMP, so it contributes to daily load,
+  ACWR and the fitness-fatigue model. It is excluded from running-specific
+  metrics (baseline, taper, decoupling and race prediction) because pace and
+  distance are not directly comparable.
+- **Strength/gym:** load is calculated with Foster session-RPE,
+  `RPE × duration_min`. The session must have an RPE to contribute load.
+- **Daily load:** all sessions on the same day are summed. Days without a
+  session between the first and last recorded dates are filled with `0` so
+  fatigue can decay.
+- **Units:** both load types are expressed in arbitrary units (AU) and treated
+  as a common scale. They are not physiologically identical; use them to compare
+  trends, not the absolute value of a strength session against a run.
+- **Privacy:** all biometric data stays in the local DuckDB file. The
+  application does not share training data with third parties; the only external
+  service is the Polar AccessLink API used for ingestion.
 
-## 2. Cómo abrir el dashboard y actualizar los datos
+---
+
+## 2. Quick start
+
+### Prerequisites
+
+- Python 3.12 (3.11 is also allowed by the package metadata).
+- [`uv`](https://docs.astral.sh/uv/) installed.
+- A Polar AccessLink client (client id and secret).
+- Docker is optional for the containerized deployment.
+
+### Local development
 
 ```bash
-make run-backend    # API en http://localhost:8000 (documentación interactiva en /docs)
-make run-frontend   # dashboard en http://localhost:8050
+make install          # uv sync --all-groups + pre-commit hooks
+cp .env.example .env  # then fill in the Polar credentials
+make run-backend      # API at http://localhost:8000 (docs at /docs)
+make run-frontend     # dashboard at http://localhost:8050
 ```
 
-- El botón **Refresh** lanza primero `POST /sync` (descarga y parsea las sesiones nuevas de Polar)
-  y después recalcula todas las métricas. La sincronización es idempotente: no vuelve a descargar
-  lo que ya está registrado. Si no se puede sincronizar, verás `Sync failed.` junto al botón y el
-  dashboard se recarga con los datos locales.
-- El dashboard muestra un aviso naranja **RPE pending** cuando hay sesiones de gimnasio sin RPE.
-  Al pulsarlo se abre un diálogo para elegir la sesión e introducir su RPE
-  (`POST /exercises/{id}/rpe`). Sin RPE, esa sesión no aporta carga.
-- Si el backend no responde, el dashboard muestra textos como `Backend offline`, `No data yet` o
-  `No training history yet`; no son errores de cálculo.
+Open <http://localhost:8050> for the dashboard and
+<http://localhost:8000/docs> for the interactive API documentation.
 
-## 3. Mapa del dashboard
+### Polar AccessLink setup
 
-El dashboard se carga una vez al abrirlo y después se actualiza con **Refresh**. De arriba abajo:
+1. Create an AccessLink client at
+   <https://admin.polaraccesslink.com/>.
+2. Register a redirect URI that matches `POLAR_REDIRECT_URI` exactly. The
+   default is `http://localhost:8000/auth/callback`.
+3. Put `POLAR_CLIENT_ID` and `POLAR_CLIENT_SECRET` in `.env`.
+4. Start the backend and open `GET /auth/login` to link the account.
+5. Press **Refresh** in the dashboard, or call `POST /sync`, to run the first
+   catch-up sync.
 
-| Zona | Contenido | Para qué sirve |
+The catch-up sync is idempotent: sessions already downloaded are not downloaded
+again. Polar's exercise listing covers the last 30 days; older sessions remain
+in DuckDB but are not re-downloaded.
+
+### Docker
+
+```bash
+make docker-up     # build and start backend + frontend
+make docker-logs   # follow the logs
+make docker-down   # stop the services
+```
+
+The dashboard is available at <http://localhost:8050> and the API at
+<http://localhost:8000>. Docker Compose reads `.env` when present and mounts the
+local `data/` directory.
+
+### Useful commands
+
+| Command | Purpose |
+| --- | --- |
+| `make lint` | Run ruff and check formatting |
+| `make format` | Auto-fix and format the code |
+| `make typecheck` | Run mypy |
+| `make test` | Run the test suite |
+| `make test-cov` | Run tests with the 80 % core-coverage gate |
+| `make db` | Open an interactive DuckDB shell (`con`) |
+| `make clean` | Remove caches and build artifacts |
+
+---
+
+## 3. Sync, RPE and data corrections
+
+### Refresh and sync
+
+The **Refresh** button in the header does two things:
+
+1. Calls `POST /sync` to download and parse new Polar sessions.
+2. Reloads all dashboard metrics from the local database.
+
+The header shows a short result such as `Synced +2 · parsed 2`. If the sync
+cannot reach Polar, it shows `Sync failed.` and the dashboard still reloads using
+the local data. Sync failures do not delete or invalidate existing sessions.
+
+At backend startup, a catch-up sync also runs when
+`POLAR_SYNC_ON_STARTUP=true`.
+
+### Recording strength RPE
+
+Strength sessions need a session RPE on the Borg CR-10 scale (0–10) to contribute
+load. The dashboard surfaces this in two places:
+
+- the orange **RPE pending** button in the header;
+- the **Gym RPE** card in the **Today** tab.
+
+Both open the **Update gym RPE** modal:
+
+1. Select the pending gym session.
+2. Enter an RPE between 0 and 10 (step 0.5).
+3. Use **Save & next** to keep the modal open for the next session or
+   **Save & close** to save and reload the metrics.
+
+Sessions without RPE are excluded from load and ACWR. If you add a missing RPE,
+the daily load, fitness-fatigue curves, ACWR and readiness can change.
+
+### Correcting session data
+
+The **Session data** card in the **Today** tab opens a manual editor. Select a
+session and correct:
+
+- start time;
+- distance (km);
+- duration (minutes);
+- average heart rate (bpm);
+- maximum heart rate (bpm).
+
+Use **Save changes** to persist the correction and reload the dashboard. This is
+useful when a FIT file has missing or inconsistent metadata.
+
+---
+
+## 4. Dashboard map
+
+The application uses three top-level tabs. The interface labels are in English,
+and this guide uses the same names so you can locate them on screen.
+
+| Area | Content | Purpose |
 | --- | --- | --- |
-| Cabecera | Título, aviso **RPE pending** y botón **Refresh** | Sincronizar, recargar métricas y completar RPE pendientes. |
-| Fila superior izquierda | **Daily status** | Semáforo de preparación diaria y freshness actual. |
-| Fila superior derecha | Tacómetro **ACWR** | Riesgo de sobrecarga según la carga aguda frente a la crónica. |
-| Centro | **Fitness / Fatigue / Freshness** | Evolución del modelo de fitness-fatiga. |
-| Panel inferior 1 | **Aerobic decoupling** | Deriva cardiovascular por kilómetro en una carrera. |
-| Panel inferior 2 | **Tapering simulator** | Pronóstico de fitness-fatiga al añadir sesiones futuras. |
-| Panel inferior 3 | **Race taper** | Plan de descarga automático hasta la Media Maratón. |
+| Header | Title, **RPE pending**, sync status, **Refresh** | Refresh Polar data, reload metrics and complete pending RPE. |
+| **Today** | Daily status, Load risk, At a glance, Freshness trend, Gym RPE, Session data | Daily readiness, ACWR and data hygiene. |
+| **Trends** | Training load, Aerobic decoupling, Recent sessions | Historical model behavior, run efficiency and session review. |
+| **Plan** | Race taper, What-if, Race predictor | Plan the final weeks and estimate race potential. |
 
-El aviso **RPE pending** solo aparece si hay sesiones de fuerza sin RPE. Muestra el número de
-pendientes y abre un diálogo con un desplegable de sesiones, un campo de RPE, **Save RPE** y
-**Apply**. Cada **Save RPE** guarda esa sesión y la quita del desplegable; **Apply** cierra el
-diálogo y recalcula todas las métricas con los RPE ya guardados.
+The **Plan** tab opens on **Race taper** by default; **What-if** and **Race
+predictor** are nested pills inside it.
 
-Los textos de la interfaz están en inglés; este documento usa esos mismos nombres para que puedas
-localizarlos en pantalla.
+---
 
-## 4. Panel de estado diario (`Daily status`)
+## 5. Today
 
-Muestra un semáforo calculado a partir del **freshness** del último día, pero **relativo a tu
-propio historial reciente** (últimos 90 días). Así el color no depende de la escala arbitraria de
-las ganancias ni de si la calibración está activa:
+### 5.1 Daily status
 
-| Color | Nivel | Percentil del freshness actual | Lectura práctica |
-| --- | --- | --- | --- |
-| Verde | **Ready** | `>= P50` | Está en la mitad alta de tu rango reciente; buen momento para calidad. |
-| Amarillo | **Caution** | `P15 – P50` | Por debajo de tu mediana reciente; controla la intensidad. |
-| Rojo | **Rest** | `< P15` | En la parte más baja de tu rango reciente; prioriza recuperación. |
-| Gris | Sin datos | — | Todavía no hay historial de entrenamiento. |
+The **Daily status** card shows a readiness traffic light, the current freshness
+and, when enough history exists, the percentile of the current freshness in the
+recent distribution.
 
-Con menos de 14 días de historial se usan los umbrales absolutos: `F >= 0` ready,
-`-5 <= F < 0` caution y `F < -5` rest. El panel muestra además
-`Percentile of your recent history: Pxx` para que veas la referencia usada.
-
-El valor `Freshness: +X.X AU` es la diferencia neta del modelo:
-
-```text
-Freshness = k1 · fitness − k2 · fatiga
-```
-
-Con los valores por defecto (`k1 = 1`, `k2 = 2`) equivale a `fitness − 2 · fatiga`; el PRD lo
-resume como `fitness − fatiga` porque usa la misma idea de balance neto. Un freshness negativo
-justo después de una sesión dura es normal: la fatiga sube rápido y decae con una constante de
-tiempo más corta que la aptitud. Lo relevante es la tendencia y cuánto tarda en recuperarse, no un
-valor aislado.
-
-## 5. Tacómetro ACWR
-
-El ACWR (Acute:Chronic Workload Ratio) compara la carga reciente con la carga de las últimas
-semanas:
-
-```text
-EWMA_hoy = λ · carga_hoy + (1 − λ) · EWMA_ayer
-λ = 2 / (N + 1)
-ACWR = EWMA_aguda(7 días) / EWMA_crónica(28 días)
-```
-
-El tacómetro muestra el **último día disponible** y colorea el número según la zona:
-
-| Zona | ACWR | Significado |
+| Color | Level | Condition |
 | --- | --- | --- |
-| **Undertraining** (azul) | `< 0.8` | Carga reciente baja frente al historial; posible desacondicionamiento. |
-| **Sweet spot** (verde) | `0.8 – 1.3` | Progresión considerada segura. |
-| **Warning** (amarillo) | `> 1.3 – 1.5` | Incremento de carga a vigilar. |
-| **Danger** (rojo) | `> 1.5` | Pico de carga; riesgo elevado de sobrecarga. |
+| Green | **Ready** | Current freshness `>= P50` of the last 90 days |
+| Yellow | **Caution** | Between `P15` and `P50` |
+| Red | **Rest** | `< P15` |
+| Gray | No data | No training history yet |
 
-Cómo interpretarlo:
+With fewer than 14 days of history, absolute thresholds are used instead:
 
-- Un ACWR cercano a `1` indica que la carga aguda es similar a la crónica.
-- Un valor alto significa que los últimos 7 días pesan mucho más que la base de 28 días; suele
-  aparecer tras un bloque intenso o al volver de un parón.
-- Un valor bajo puede indicar descarga, taper o pérdida de estímulo, no necesariamente algo malo.
-- El dial está dibujado de `0` a `2.0`; si el valor real supera `2.0`, el indicador numérico se
-  sigue mostrando, pero queda fuera de la escala visual.
-- El EWMA se inicializa con el primer valor de carga, así que los primeros días parten de un ACWR
-  de `1.0` y van convergiendo. Hasta acumular varias semanas (idealmente ~28 días), el valor está
-  dominado por el arranque y debe leerse con cautela.
-- El ACWR es una señal de carga, no una predicción de lesión: no incorpora sueño, estrés, terreno,
-  edad ni calidad del descanso.
+- `freshness >= 0` → ready;
+- `-5 <= freshness < 0` → caution;
+- `freshness < -5` → rest.
 
-## 6. Gráfica `Fitness / Fatigue / Freshness`
+The card also shows `Freshness: +X.X AU` and, when available,
+`Recent percentile: Pxx`. A negative freshness immediately after a hard session
+is normal: fatigue rises quickly and decays faster than fitness. Focus on the
+trend and recovery time, not on a single value.
 
-Tres líneas con la evolución diaria del modelo de Banister:
+### 5.2 Load risk (ACWR)
 
-| Línea | Color | Qué representa |
+The **Load risk** card shows the latest ACWR value, its risk zone and the acute
+and chronic components:
+
+```text
+Acute 7d   = EWMA of daily load with a 7-day window
+Chronic 28d = EWMA of daily load with a 28-day window
+Ratio      = acute / chronic
+```
+
+| Zone | ACWR | Meaning |
 | --- | --- | --- |
-| **Fitness** | Azul | Aptitud acumulada; sube con la carga y decae lentamente. |
-| **Fatigue** | Rojo | Fatiga acumulada; sube con la carga y decae rápidamente. |
-| **Freshness (TSB)** | Verde | Balance neto `k1 · fitness − k2 · fatiga`; positivo = preparado. |
+| **Undertraining** (blue) | `< 0.8` | Recent load is low relative to history; possible deconditioning or taper. |
+| **Sweet spot** (green) | `0.8 – 1.3` | Considered a safe progression range. |
+| **Warning** (yellow) | `> 1.3 – 1.5` | Load increase to monitor. |
+| **Danger** (red) | `> 1.5` | Load spike; elevated overuse-risk signal. |
 
-El modelo usa una recurrencia diaria:
+The strip is normally drawn from `0` to `2.0`. If the ratio is higher, the axis
+extends and the numeric value remains visible. The EWMA starts from the first
+load value, so the first days are close to `1.0` and converge as history
+accumulates. Wait for several weeks (ideally around 28 days) before reading the
+ratio as a stable signal.
 
-```text
-fitness_t = fitness_{t−1} · e^(−1/τ1) + carga_t
-fatiga_t  = fatiga_{t−1}  · e^(−1/τ2) + carga_t
-freshness_t = k1 · fitness_t − k2 · fatiga_t
-performance_t = p0 + freshness_t
-```
+### 5.3 At a glance
 
-Valores por defecto: `τ1 = 45` días, `τ2 = 15` días, `k1 = 1`, `k2 = 2`, `p0 = 0`. Se pueden
-cambiar con las variables `ATHLETE_TAU_1`, `ATHLETE_TAU_2`, `ATHLETE_K_1`, `ATHLETE_K_2` y
-`ATHLETE_P0`.
+The **At a glance** card summarizes four values:
 
-Patrones habituales:
+- **Freshness** — current net balance and its 7-day change.
+- **ACWR** — current ratio and risk zone.
+- **Fitness** — current fitness component and its 7-day change.
+- **Fatigue** — current fatigue component and its 7-day change.
 
-- **Bloque de carga**: la fatiga sube más rápido que el fitness, el freshness cae y luego se
-  recupera al reducir la carga. Es el comportamiento esperado de una sobrecarga funcional.
-- **Taper**: al bajar la carga, la fatiga cae antes que el fitness; el freshness repunta mientras
-  el fitness se mantiene. Esa es la señal que busca el simulador.
-- **Descanso prolongado**: ambas curvas bajan; el freshness puede subir, pero también se pierde
-  fitness.
-- **Días sin sesión**: se introducen como carga `0`, de modo que las curvas decaen en lugar de
-  quedarse planas.
+The 7-day delta is shown only when enough history exists; otherwise the card
+shows `7d —`.
 
-La gráfica muestra solo el historial persistido, no el pronóstico. El eje X usa etiquetas
-`mes día` (sin año), y el eje Y está en AU: compara formas y tendencias, no valores absolutos entre
-personas. La API también devuelve `performance`, pero el dashboard no la dibuja.
+### 5.4 Freshness trend
 
-> El dashboard calibra las ganancias del modelo a partir del rendimiento observado (EF por
-> carrera). Para evitar la mala identificabilidad del modelo, los tiempos `tau1`/`tau2` quedan
-> **fijos en los priors** y solo se estiman `p0`, `k1` y `k2` con mínimos cuadrados acotados y una
-> penalización ridge hacia la forma del prior. El ajuste se acepta solo si, además de explicar
-> varianza in-sample, mejora el RMSE en validación cruzada temporal frente al baseline con forma de
-> prior. Si no, se usan los **priors** de configuración como respaldo. Puedes consultar el
-> resultado en `GET /metrics/calibration` (el antiguo `/metrics/ekf` sigue disponible como alias).
+The **Freshness trend** card is a compact sparkline with a zero line:
 
-## 7. Panel de desacoplamiento aeróbico (`Aerobic decoupling`)
+- **Above zero:** freshness is positive; the athlete is relatively fresh.
+- **Below zero:** fatigue dominates; this is expected after hard sessions.
+- **Rest days:** load is `0`, so the curve decays instead of staying flat.
 
-Este panel analiza una carrera concreta, seleccionable en **Run**. Calcula el factor de eficiencia
-por kilómetro:
+The full fitness, fatigue and freshness history is in the **Trends** tab.
 
-```text
-EF_km = velocidad_media_km / FC_media_km
-```
+### 5.5 Gym RPE
 
-La gráfica de barras muestra `EF` en cada kilómetro. Un EF más alto significa más velocidad a la
-misma frecuencia cardíaca, es decir, mejor eficiencia aeróbica.
+The **Gym RPE** card reports how many gym sessions still need an RPE. If none are
+pending, it says that all gym sessions have RPE logged. If some are pending, the
+**Review RPE** button opens the same modal as the header.
 
-El porcentaje de desacoplamiento compara las dos mitades de la carrera:
+### 5.6 Session data
 
-```text
-decoupling = (EF_media_primera_mitad − EF_media_segunda_mitad)
-             / EF_media_primera_mitad × 100
-```
+The **Session data** card lets you select any session and correct its date,
+distance, duration or heart-rate fields. The editor is a data-quality tool, not a
+way to rewrite the physiological model: corrected metadata immediately changes
+the load and downstream metrics.
 
-- **Valor positivo**: el EF cayó en la segunda mitad; hay deriva cardiovascular (mismo pulso, menos
-  velocidad). Puede indicar fatiga, deshidratación, calor, terreno o falta de durabilidad.
-- **Valor cercano a cero**: eficiencia estable durante toda la carrera.
-- **Valor negativo**: el EF subió en la segunda mitad; suele ocurrir al calentar o al regular mejor
-  el esfuerzo.
+---
 
-Requisitos y matices:
+## 6. Trends
 
-- Hacen falta al menos **2 kilómetros con datos válidos** de velocidad y FC; si no, el panel indica
-  `Not enough data to compute decoupling`.
-- Se usa velocidad, no ritmo: por eso un EF mayor siempre es mejor, aunque en ritmo (`min/km`) un
-  número menor sea más rápido.
-- La aplicación no define umbrales de bueno/malo. Como referencia orientativa de entrenamiento (no
-  implementada en el código), se suele considerar aceptable una deriva inferior a ~5 %, pero el
-  contexto (calor, hidratación, desnivel, duración) importa más que el número aislado.
-- Compara la misma ruta y condiciones, y mira la tendencia entre sesiones más que una única carrera.
+### 6.1 Training load
 
-## 8. Simulador de tapering (`Tapering simulator`)
+The **Training load** chart shows three daily series:
 
-Permite añadir sesiones futuras y ver cómo evolucionarían fitness, fatiga y freshness:
-
-1. Rellena **Date**, **Distance (km)**, **Pace (min/km)** y **RPE (0–10)**.
-2. Pulsa **Add** para añadir la sesión a la lista; **Clear** vacía la lista.
-3. Pulsa **Simulate** para pedir el pronóstico al backend (`POST /simulate/taper`).
-
-La carga de una sesión planificada se estima como:
-
-```text
-duración_min = distancia_km × ritmo_min_km
-carga = RPE × duración_min
-```
-
-Es decir, se usa session-RPE también para las carreras proyectadas, para mantener la misma escala
-de AU que el historial. No es un TRIMP calculado con FC futura, porque esa FC no existe.
-
-La gráfica resultante:
-
-- **Línea sólida**: historial real.
-- **Línea discontinua**: pronóstico a partir de las sesiones añadidas.
-- **Línea vertical punteada**: frontera entre historial y pronóstico.
-- Si no hay historial, todo el trazado es pronóstico y la frontera no aparece.
-
-Cómo usarlo:
-
-- Añade las sesiones que planeas hasta la carrera y observa si el freshness llega positivo el día
-  objetivo.
-- Un taper correcto mantiene el fitness mientras la fatiga cae; si añades demasiada carga cerca de
-  la carrera, la fatiga seguirá alta y el freshness no repuntará.
-- El simulador no conoce el objetivo de tiempo ni el resultado real de la carrera: solo proyecta
-  carga, fitness y fatiga.
-- Las fechas deben ser futuras para que el pronóstico tenga sentido. El pronóstico usa los mismos
-  parámetros que la gráfica histórica (calibrados si la validación lo permite, si no los priors).
-- La escala de carga mezcla TRIMP de carrera y sRPE de fuerza; interpreta el resultado como
-  tendencia relativa, no como una predicción exacta de rendimiento.
-
-### Plan de taper hacia la carrera (`Race taper`)
-
-El segundo formulario genera automáticamente un plan de descarga para las semanas previas a la
-Media Maratón. Igual que el simulador, empieza **vacío** (sin valores precargados):
-
-1. Rellena **Race date** (por ejemplo `2026-12-13`), **Weekly km**, **Runs/week**,
-   **Pace (min/km)**, **RPE** y **Taper weeks**.
-2. Pulsa **Plan taper** para pedir el plan al backend (`POST /simulate/taper/plan`).
-
-El volumen semanal se reduce de forma lineal (factores `0.75 → 0.55 → 0.35` para tres semanas)
-manteniendo el ritmo y el RPE, es decir, se conserva la intensidad. Las sesiones se colocan en
-martes, jueves y domingo y nunca caen el día de la carrera, de modo que el freshness de la mañana
-de carrera es el objetivo del pronóstico. La gráfica marca la carrera con una línea vertical.
-
-Si quieres una referencia, `GET /metrics/running-baseline` devuelve el volumen semanal, el número
-de carreras y el ritmo medios de las últimas cuatro semanas, pero el formulario no los precarga:
-los introduces tú.
-
-> El plan solo proyecta carrera: no reduce las sesiones de gimnasio. Ajusta esas sesiones aparte si
-> quieres modelar la descarga completa.
-
-## 9. Predicción de carrera (`Race predictor`)
-
-Estima el tiempo que podrías hacer en una carrera a tope a partir de tus mejores esfuerzos. No usa
-el ritmo bruto de un rodaje: cada esfuerzo se clasifica por **%HRR** (reserva de frecuencia
-cardíaca) y se compara con su **EF** (velocidad/FC), de modo que entrenar suave no hace que la
-predicción sea lenta.
-
-1. Elige la distancia (5k, 10k, media maratón, maratón o **Custom**). Si eliges **Custom**,
-   aparece un campo para escribir la distancia.
-2. Opcionalmente introduce una carrera o test de referencia (distancia y tiempo). Si lo dejas
-   vacío, se usan los mejores esfuerzos detectados en el historial.
-3. Pulsa **Predict**. La UI usa siempre selección automática de modelo; la API permite forzar
-   `riegel` o `critical_speed` si lo necesitas.
-
-Niveles de intensidad usados para seleccionar referencias:
-
-| Nivel | %HRR | Uso |
+| Line | Color | Meaning |
 | --- | --- | --- |
-| `race` | ≥ 88% | Referencia directa; confianza alta. |
-| `hard` | 80–88% | Referencia con confianza media. |
-| `moderate` | 70–80% | Solo con confianza baja. |
-| `easy` | < 70% | No se usa como ritmo de carrera; solo tendencia de EF/fitness. |
+| **Fitness** | Blue | Slow-decaying positive adaptation; rises with load and decays slowly. |
+| **Fatigue** | Red | Fast-decaying negative component; rises with load and decays quickly. |
+| **Freshness (TSB)** | Green | Net balance `k1 · fitness − k2 · fatigue`; positive means prepared. |
 
-Modelos:
+Use the **30d**, **90d**, **180d**, **1y** and **All** buttons to change the
+window. The current values are also shown as chips above the chart.
 
-- **Riegel**: `T2 = T1 · (D2 / D1)^k`, con `k ≈ 1.06`. Necesita una referencia.
-- **Critical speed**: `D = CS · T + D'`, ajustado con 2–3 esfuerzos de calidad en distancias
-  distintas.
-- **Auto**: usa critical speed si hay al menos tres esfuerzos de calidad y buen `R²`; si no,
-  Riegel; si solo hay rodajes fáciles, extrapola con EF y FC de carrera y marca confianza baja.
+Typical patterns:
 
-La respuesta incluye tiempo central, ritmo, horquilla rápida/lenta, modelo, confianza, esfuerzos
-usados y notas. Cada esfuerzo se ajusta por el cambio de fitness de Banister desde su fecha y se
-convierte a un **tiempo equivalente a esfuerzo de carrera**: se estima la velocidad a un `%HRR`
-objetivo según la distancia de la referencia (≈93% en 5k, 90% en 10k, 88% en media y 85% en
-maratón) usando su EF (`velocidad/FC`), con un límite del `+15%` para no extrapolar en exceso. Así
-un tramo al 80% HRR no devuelve el mismo tiempo que una carrera a tope.
+- **Load block:** fatigue rises faster than fitness, freshness falls, then
+  recovers when load decreases. This is the expected functional-overload
+  response.
+- **Taper:** when load drops, fatigue falls before fitness; freshness rises while
+  fitness is preserved. This is the signal the taper tools target.
+- **Prolonged rest:** both curves fall; freshness may rise, but fitness is also
+  lost.
+- **Rest days:** inserted as load `0`, so the curves decay.
 
-> Es una predicción de **potencial**, no de “hoy”: no descuenta la fatiga del día. Un test o carrera
-> real mejora mucho la confianza; los tramos de entrenamiento son una referencia conservadora.
+The y-axis is in AU. Compare shapes and trends, not absolute values between
+athletes. The model also exposes `performance`, but the dashboard does not plot
+it.
 
-## 10. Endpoints útiles
+> The dashboard calibrates the model gains from observed running performance
+> (efficiency factor per run). To avoid the model's identifiability problem, the
+> time constants `tau1` and `tau2` stay **fixed at the priors** and only `p0`,
+> `k1` and `k2` are estimated with bounded least squares and a ridge penalty
+> toward the prior shape. The fit is accepted only when it explains enough
+> in-sample variance **and** improves leave-one-out cross-validation RMSE over
+> the prior-shaped baseline. Otherwise the configured priors are used. Check the
+> result at `GET /metrics/calibration`; the old `/metrics/ekf` endpoint remains
+> available as a deprecated alias.
 
-La API expone las mismas métricas que consume el dashboard. La documentación interactiva está en
+### 6.2 Aerobic decoupling
+
+The **Aerobic decoupling** panel analyzes one selected run. The efficiency factor
+is:
+
+```text
+EF_km = mean speed in m/s / mean heart rate in bpm
+```
+
+Higher EF means more speed at the same heart rate. The bar chart shows EF per
+kilometer and a dotted mean reference line.
+
+The summary compares the two halves of the run:
+
+```text
+decoupling = (EF_first_half − EF_second_half) / EF_first_half × 100
+```
+
+- **Positive:** EF fell in the second half; cardiovascular drift (same heart
+  rate, lower speed). Possible causes include fatigue, dehydration, heat, terrain
+  or limited durability.
+- **Near zero:** stable efficiency throughout the run.
+- **Negative:** EF rose in the second half; common when warming up or pacing more
+  evenly.
+
+The UI colors the result green at `<= 5 %`, yellow between `5 %` and `10 %`, and
+red above `10 %`. These are orientation bands, not medical thresholds; context
+(heat, hydration, elevation, duration) matters more than a single number.
+Decoupling requires at least **2 kilometers** with valid speed and heart-rate
+data. The panel uses speed, not pace: a higher EF is always better.
+
+### 6.3 Recent sessions
+
+The **Recent sessions** card lists the latest runs and gym sessions with:
+
+- date and activity type;
+- distance, duration and average heart rate when available;
+- an RPE badge (`RPE n`, `RPE pending` or `No RPE`).
+
+Use **Review RPE** to open the pending-RPE modal. Gym sessions without RPE do not
+contribute load.
+
+---
+
+## 7. Plan
+
+### 7.1 Race taper
+
+The **Race taper** panel generates a progressive pre-race plan. It opens by
+default when you select the **Plan** tab.
+
+1. Fill in **Race date**, **Weekly km**, **Runs/week**, **Pace (min/km)**,
+   **RPE (0–10)** and **Taper weeks**.
+2. Optionally press **Use recent baseline** to prefill the recent weekly volume,
+   runs per week, pace and RPE; the taper defaults to three weeks. If no baseline
+   is available, enter the values manually.
+3. Press **Plan taper**.
+
+The weekly volume decreases linearly while intensity (pace and RPE) is preserved:
+
+- multi-week taper: factors from `0.75` to `0.35`;
+- three-week taper: `0.75`, `0.55`, `0.35`;
+- one-week taper: `0.5`.
+
+The baseline is the last four weeks of running data and requires at least four
+valid sessions. For a three-run week, sessions are placed on Tuesday, Thursday
+and Sunday and never on or after race day, so race morning is a rest day in the
+projection. The chart marks race day with a vertical line and shows the forecast
+through race morning.
+
+The plan models running only. Gym sessions are not reduced automatically; adjust
+them separately if you want to model the complete taper.
+
+### 7.2 What-if simulator
+
+The **What-if** panel projects future sessions on top of the real history.
+
+1. Fill in **Date**, **Distance (km)**, **Pace (min/km)** and **RPE (0–10)**.
+2. Press **Add** to append the session to the planned list; **Clear** empties it.
+3. Press **Simulate**.
+
+**Use recent baseline** fills a typical session distance, pace and RPE from the
+last four weeks; the date still has to be chosen manually. If no recent baseline
+is available, enter the values manually. Planned session load is estimated as:
+
+```text
+duration_min = distance_km × pace_min_per_km
+load = RPE × duration_min
+```
+
+This uses session-RPE for projected runs because future heart rate does not
+exist. The chart uses:
+
+- **solid line:** real history;
+- **dashed line:** forecast from the planned sessions;
+- **vertical dotted line:** boundary between history and forecast.
+
+If there is no history, the entire chart is a forecast and the boundary is
+omitted. The status line reports the projected number of days and the model used
+(calibrated or priors). Add sessions up to the race to see whether freshness
+turns positive on race morning.
+
+### 7.3 Race predictor
+
+The **Race predictor** estimates the time you could achieve at maximal effort.
+
+1. Choose a **Race distance**: 5 km, 10 km, half marathon, marathon or
+   **Custom**.
+2. If you choose **Custom**, enter the distance in kilometers.
+3. Press **Predict**.
+
+The result shows:
+
+- predicted time and pace;
+- fast and slow bounds;
+- model and confidence;
+- explanatory notes;
+- the efforts used, under **Efforts used**.
+
+**Advanced model** lets you force **Auto (recommended)**, **Riegel**,
+**Critical speed** or **HR extrapolation**, and adjust the Riegel exponent
+(default `1.06`). Auto uses critical speed when possible, then Riegel, then
+heart-rate extrapolation.
+
+Candidate efforts are classified by relative heart-rate reserve (`%HRR`):
+
+| Tier | %HRR | Use |
+| --- | --- | --- |
+| `race` | `>= 88 %` | Direct reference; high confidence |
+| `hard` | `80 – 88 %` | Reference with medium confidence |
+| `moderate` | `70 – 80 %` | Low-confidence reference only |
+| `easy` | `< 70 %` | Not used as race pace; fitness/EF trend only |
+
+The UI predicts from detected best efforts. The API also accepts a manual
+`reference` (distance and time) for custom integrations. Easy running does not
+make the prediction artificially slow because efforts are corrected by heart
+rate and efficiency factor, not by raw pace.
+
+> The prediction is a **potential**, not a guarantee for today. It does not
+> subtract same-day fatigue. A real race or time trial substantially increases
+> confidence.
+
+---
+
+## 8. Metric definitions and formulas
+
+### 8.1 Banister TRIMP (running and elliptical)
+
+$$
+TRIMP = D \cdot HR_r \cdot a \cdot e^{b \cdot HR_r}
+$$
+
+where
+
+$$
+HR_r = \operatorname{clamp}\!\left(
+\frac{HR - HR_{\text{rest}}}{HR_{\max} - HR_{\text{rest}}},
+0, 1
+\right)
+$$
+
+and the coefficients are:
+
+- male: `a = 0.64`, `b = 1.92`;
+- female: `a = 0.86`, `b = 1.67`.
+
+`D` is the duration in minutes. The implementation integrates over the
+second-by-second heart-rate series instead of using only the average heart rate.
+
+### 8.2 Foster session-RPE (strength)
+
+$$
+TRIMP_{\text{gym}} = RPE \cdot D_{\min}
+$$
+
+`RPE` is the whole-session effort on the Borg CR-10 scale (0–10) and `D_min` is
+the duration in minutes.
+
+### 8.3 Daily load
+
+Session loads are summed per calendar day. Days between the first and last
+session are filled with `0.0`. Running TRIMP and strength sRPE share the same AU
+scale; this is a practical simplification, not a claim of physiological
+equivalence.
+
+### 8.4 Banister fitness-fatigue model
+
+$$
+\frac{dg}{dt} = -\frac{g}{\tau_1} + w(t)
+\qquad
+\frac{dh}{dt} = -\frac{h}{\tau_2} + w(t)
+$$
+
+$$
+P(t) = P_0 + k_1 g(t) - k_2 h(t)
+$$
+
+For daily loads:
+
+$$
+g_t = g_{t-1}e^{-1/\tau_1} + w_t
+\qquad
+h_t = h_{t-1}e^{-1/\tau_2} + w_t
+$$
+
+$$
+Freshness_t = k_1 g_t - k_2 h_t
+\qquad
+Performance_t = P_0 + Freshness_t
+$$
+
+Default priors: `tau_1 = 45` days, `tau_2 = 15` days, `k_1 = 1.0`,
+`k_2 = 2.0`, `P_0 = 0.0`.
+
+### 8.5 Calibration gate
+
+Calibration is attempted only when there are at least **8 observations**. The fit
+is accepted only if:
+
+- in-sample `R² >= 0.1`;
+- leave-one-out cross-validation RMSE improves by at least **5 %** over the
+  prior-shaped baseline;
+- the gains are positive and `tau_1 > tau_2`.
+
+Otherwise the physiological priors are used. This is why some dashboards show
+prior-shaped curves even with real data.
+
+### 8.6 ACWR
+
+$$
+EWMA_t = \lambda L_t + (1-\lambda) EWMA_{t-1},
+\qquad
+\lambda = \frac{2}{N+1}
+$$
+
+with `N = 7` for acute load and `N = 28` for chronic load:
+
+$$
+ACWR_t = \frac{EWMA_t^{\text{acute}}}{EWMA_t^{\text{chronic}}}
+$$
+
+### 8.7 Efficiency factor and decoupling
+
+$$
+EF_k = \frac{\overline{v}_k}{\overline{HR}_k}
+$$
+
+$$
+\text{decoupling} =
+\frac{\overline{EF}_{\text{first}} - \overline{EF}_{\text{second}}}
+{\overline{EF}_{\text{first}}} \times 100
+$$
+
+`v` is speed in meters per second and `HR` is heart rate in bpm.
+
+### 8.8 Race prediction
+
+Riegel:
+
+$$
+T_2 = T_1 \left(\frac{D_2}{D_1}\right)^k,
+\qquad k \approx 1.06
+$$
+
+Critical speed:
+
+$$
+D = CS \cdot T + D'
+$$
+
+Efforts are adjusted by the Banister fitness change since their date and converted
+to an equivalent race effort. Target race-level `%HRR` is approximately 93 % for
+short races, 90 % for 10K, 88 % for the half marathon and 85 % for the marathon.
+
+---
+
+## 9. Configuration reference
+
+Configuration uses environment variables with the `POLAR_` and `ATHLETE_`
+prefixes. Copy `.env.example` to `.env`; `.env` is git-ignored and must never be
+committed.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `POLAR_CLIENT_ID` | empty | Polar AccessLink client id (required for sync) |
+| `POLAR_CLIENT_SECRET` | empty | Polar AccessLink client secret (required for sync) |
+| `POLAR_REDIRECT_URI` | `http://localhost:8000/auth/callback` | Must match the URI registered in Polar |
+| `POLAR_AUTHORIZE_URL` | Polar authorization endpoint | OAuth2 authorization URL |
+| `POLAR_TOKEN_URL` | Polar token endpoint | OAuth2 token URL |
+| `POLAR_API_URL` | `https://www.polaraccesslink.com/v3` | AccessLink API base URL |
+| `POLAR_SCOPE` | `accesslink.read_all` | Requested OAuth2 scope |
+| `POLAR_MEMBER_ID` | `athlete-stress-sim` | Partner member id used to register the user |
+| `POLAR_SYNC_ON_STARTUP` | `true` | Run a catch-up sync when the backend starts |
+| `ATHLETE_HR_MAX` | `200` | Maximum heart rate (bpm) |
+| `ATHLETE_HR_REST` | `55` | Resting heart rate (bpm) |
+| `ATHLETE_TAU_1` | `45.0` | Fitness time constant (days) |
+| `ATHLETE_TAU_2` | `15.0` | Fatigue time constant (days) |
+| `ATHLETE_K_1` | `1.0` | Fitness gain |
+| `ATHLETE_K_2` | `2.0` | Fatigue gain |
+| `ATHLETE_P0` | `0.0` | Baseline performance |
+| `ATHLETE_SEX` | `male` | Selects the Banister TRIMP coefficients |
+| `ATHLETE_DB_PATH` | `data/athleta.duckdb` | Local DuckDB database path |
+| `ATHLETE_RAW_DATA_DIR` | `data/raw` | Directory for raw Polar files |
+
+> `.env.example` contains the user-zero reference values, which may differ from
+> the code defaults. Use the values that match your own physiology.
+
+---
+
+## 10. API endpoints
+
+The dashboard uses the same API. Interactive documentation is available at
 `http://localhost:8000/docs`.
 
-| Método | Ruta | Uso |
+| Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/health` | Comprobar que el backend está vivo. |
-| `GET` | `/config/physiology` | Ver los priors fisiológicos activos (sin credenciales). |
-| `GET` | `/auth/login` | Iniciar el flujo OAuth2 con Polar. |
-| `GET` | `/auth/callback` | Callback OAuth2. |
-| `GET` | `/auth/status` | Estado de la vinculación con Polar. |
-| `GET` | `/auth/refresh` | Renovar el token de acceso. |
-| `POST` | `/sync` | Descargar y parsear sesiones nuevas de Polar. |
-| `GET` | `/sync/status` | Contadores de ingesta y sesiones parseadas. |
-| `GET` | `/exercises?kind=all\|run\|gym\|elliptical` | Listar sesiones. |
-| `GET` | `/exercises/{id}` | Ver una sesión. |
-| `POST` | `/exercises/{id}/rpe` | Registrar el RPE de una sesión de fuerza. |
-| `GET` | `/metrics/trimp/{id}` | Carga interna de una sesión. |
-| `GET` | `/metrics/acwr` | Serie diaria de ACWR y zonas. |
-| `GET` | `/metrics/banister` | Serie diaria de fitness, fatiga, performance y freshness. |
-| `GET` | `/metrics/calibration` | Ganancias Banister calibradas (NLS con `tau` fijo) y su validación (R² y CV). |
-| `GET` | `/metrics/ekf` | Alias obsoleto de `/metrics/calibration`. |
-| `GET` | `/metrics/running-baseline` | Volumen, ritmo y RPE medios de las últimas 4 semanas. |
-| `GET` | `/metrics/decoupling/{id}` | EF por kilómetro y desacoplamiento de una carrera. |
-| `POST` | `/simulate` | Simular una serie de cargas diarias arbitraria. |
-| `POST` | `/simulate/taper` | Simular sesiones planificadas sobre el historial. |
-| `POST` | `/simulate/taper/plan` | Generar un plan de taper progresivo hasta race day. |
-| `GET` | `/metrics/best-efforts` | Mejores esfuerzos detectados por distancia, con %HRR y EF. |
-| `POST` | `/metrics/race-prediction` | Predecir tiempo de carrera (auto, Riegel o critical speed). |
+| `GET` | `/health` | Backend liveness |
+| `GET` | `/config/physiology` | Active physiological constants (no credentials) |
+| `GET` | `/auth/login` | Start the Polar OAuth2 flow |
+| `GET` | `/auth/callback` | OAuth2 callback |
+| `GET` | `/auth/status` | Polar account link status |
+| `GET` | `/auth/refresh` | Refresh the access token |
+| `POST` | `/sync` | Download and parse new Polar sessions |
+| `GET` | `/sync/status` | Ingestion counters and parsed sessions |
+| `GET` | `/exercises?kind=all\|run\|gym\|elliptical` | List sessions |
+| `GET` | `/exercises/{id}` | Read one session |
+| `POST` | `/exercises/{id}/rpe` | Record a strength-session RPE |
+| `PATCH` | `/exercises/{id}` | Correct session metadata |
+| `GET` | `/metrics/trimp/{id}` | Internal load of one session |
+| `GET` | `/metrics/acwr` | Daily ACWR series and zones |
+| `GET` | `/metrics/banister` | Daily fitness, fatigue, performance and freshness |
+| `GET` | `/metrics/calibration` | Calibrated Banister gains and validation diagnostics |
+| `GET` | `/metrics/ekf` | Deprecated alias of `/metrics/calibration` |
+| `GET` | `/metrics/running-baseline` | Recent weekly volume, pace and RPE |
+| `GET` | `/metrics/decoupling/{id}` | EF per kilometer and decoupling for a run |
+| `GET` | `/metrics/best-efforts` | Best efforts with `%HRR` and EF |
+| `POST` | `/metrics/race-prediction` | Predict a race time |
+| `POST` | `/simulate` | Simulate an arbitrary daily-load series |
+| `POST` | `/simulate/taper` | Project planned sessions over the history |
+| `POST` | `/simulate/taper/plan` | Generate a progressive race-taper plan |
 
-## 11. Limitaciones que afectan a la interpretación
+---
 
-- **Solo cuentan las sesiones con carga calculable**. Una sesión de fuerza sin RPE, o una carrera o
-  elíptica sin muestras de FC, no aporta carga y puede hacer que el ACWR y las curvas subestimen el
-  entrenamiento real. Si añades un RPE que faltaba, las métricas cambiarán.
-- **La elíptica cuenta como carga global, no como carrera**. Suma en ACWR y Banister, pero no
-  aparece en el selector de desacoplamiento, el baseline de carrera, la predicción de carrera ni
-  el plan de taper.
-- **El historial de Polar es limitado**. El cliente consulta el listado de ejercicios de los
-  últimos 30 días; lo ya descargado permanece en DuckDB. La primera sincronización no reconstruye
-  meses de pasado.
-- **La calibración depende de la cantidad y la calidad de los datos**. Con pocas semanas el
-  rendimiento observado (EF) apenas varía y el ajuste puede no superar los umbrales de R² y de
-  mejora en validación cruzada, en cuyo caso el dashboard usa los priors. Consulta
-  `/metrics/calibration` para ver si la calibración está activa y cuánto mejora.
-- **La predicción de carrera es un potencial**, no una garantía: depende de la calidad de las
-  referencias (tests/carreras), del %HRR de los esfuerzos y de la extrapolación de distancia. Los
-  tramos de entrenamiento no son equivalentes a una carrera a tope.
-- **El plan de taper solo modela carrera** y asume que el entrenamiento entre hoy y el inicio de la
-  descarga sigue el historial; no reduce automáticamente las sesiones de gimnasio.
-- **La carga combinada es una simplificación**: TRIMP de carrera y sRPE de fuerza se suman en AU
-  aunque no sean equivalentes fisiológicamente.
-- **El ACWR y el freshness son señales**, no diagnósticos. Valores altos o bajos deben contrastarse
-  con cómo te sientes, el contexto de entrenamiento y la evolución a lo largo de varias semanas.
-- **Refresh depende de que el backend pueda contactar con Polar**. Si el token ha caducado o no hay
-  red, la sincronización falla (`Sync failed.`) pero las métricas locales siguen disponibles.
+## 11. Troubleshooting
+
+| Symptom | Likely cause | Action |
+| --- | --- | --- |
+| **Backend offline** | The API is not running or `API_URL` is wrong | Start the backend with `make run-backend`; in Docker, check `make docker-logs` |
+| **Sync failed.** | Polar token expired, no network, or invalid credentials | Open `/auth/status`, re-link with `/auth/login`, check `.env`, then Refresh again |
+| **No training history yet** | The database has no sessions | Run `POST /sync` or press Refresh |
+| **No data yet** in a panel | That metric has no valid samples (e.g. no heart rate or no run) | Sync more sessions or check the session data |
+| **RPE pending** | Strength sessions are missing an RPE | Open the modal and save an RPE for each session |
+| **ACWR near 1.0** at the start | EWMA is seeded with the first load value | Wait for several weeks of history before interpreting the ratio |
+| **Calibration not active** | Fewer than 8 observations or the CV gate failed | Check `GET /metrics/calibration`; the priors are being used |
+| **Not enough data to compute decoupling** | Fewer than 2 kilometers with valid speed and heart rate | Choose a longer run or check the telemetry |
+| **Low-confidence race prediction** | Only easy efforts are available | Add a race/time trial through the API or run a harder effort |
+| **Use recent baseline does nothing** | Fewer than 4 valid running sessions in the last 4 weeks | Enter the baseline values manually or sync more runs |
+| **Docker build looks frozen** | First image build downloads dependencies | Wait; follow progress with `make docker-logs` |
+
+---
+
+## 12. Limitations and interpretation
+
+- **Only sessions with calculable load count.** A strength session without RPE,
+  or a run/elliptical session without heart-rate samples, contributes no load and
+  can make ACWR and the curves underestimate real training.
+- **Elliptical is global load, not running.** It contributes to ACWR and
+  Banister but does not appear in the decoupling selector, running baseline,
+  race prediction or taper plan.
+- **Polar history is limited.** The client lists exercises from the last 30 days;
+  already downloaded sessions stay in DuckDB. The first sync does not rebuild
+  months of history.
+- **Calibration depends on data quantity and quality.** With few weeks, observed
+  performance barely varies and the fit may not pass the R² and
+  cross-validation gates; the dashboard then uses the priors. Check
+  `/metrics/calibration` to see whether calibration is active and how much it
+  improves.
+- **Race prediction is a potential**, not a guarantee. It depends on the quality
+  of the references (tests/races), the `%HRR` of the efforts and distance
+  extrapolation. Training segments are not equivalent to a full race effort.
+- **The taper plan models running only.** It assumes training between today and
+  the start of the taper follows the history; it does not reduce gym sessions
+  automatically.
+- **The combined load scale is a simplification.** Running TRIMP and strength
+  sRPE are summed in AU even though they are not physiologically equivalent.
+- **ACWR and freshness are signals, not diagnoses.** High or low values should
+  be checked against how you feel, training context and several weeks of trend.
+- **Refresh depends on Polar connectivity.** If the token has expired or there is
+  no network, sync fails but local metrics remain available.

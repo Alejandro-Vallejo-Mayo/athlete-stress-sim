@@ -11,8 +11,8 @@ Project-wide standards for **athlete-stress-sim**. Every code artifact must comp
 
 - Identifiers, comments, docstrings, log/error messages, test names, commit
   messages, branch names, and config/build comments are written in **English**.
-- Product and planning documents (`docs/product-requirements.md`, `docs/roadmap.md`,
-  `docs/user-guide.md`) are maintained in Spanish and are **out of scope** for this rule.
+- Public documentation under `docs/` (product requirements, roadmap, user guide,
+  architecture, mathematical model and validation) is written in **English**.
 - The public portfolio `README.md` is written in English (roadmap S16).
 
 ## 2. Style: PEP 8, enforced by ruff
