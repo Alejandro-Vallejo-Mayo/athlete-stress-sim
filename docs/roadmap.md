@@ -113,8 +113,8 @@ good form.
 
 - **S1–S15:** delivered. S14 keeps one non-blocking maintenance item (minor
   bug fixes from real use); no blocking defects were found.
-- **S16:** in progress (English documentation set, screenshot integration,
-  secret review, license/changelog and release tag).
+- **S16:** in progress (public README, dashboard captures, secret review,
+  license/changelog and release tag).
 - **Release:** `v1.0.0` is pending until the documentation and release checklist
   are closed.
 
@@ -343,9 +343,10 @@ NLS with fixed `tau` + ridge and a CV gate; kept as a historical reference.*
 
 **Objective:** put the system to work with real data.
 
-- [x] Sync at least 2 weeks of real data (3 gym + 3 running days). Verified:
-  14 runs + 11 gym sessions (2026-10-03 → 2026-11-03), 11/11 gym sessions with
-  RPE.
+- [x] Sync at least 2 weeks of real data (3 gym + 3 running days). Verified at
+  S14 close: 14 runs + 11 gym sessions (2026-10-03 → 2026-11-03), 11/11 gym
+  sessions with RPE. The final snapshot in [`validation.md`](validation.md) covers
+  17 runs + 13 strength + 1 elliptical session and 16 calibration observations.
 - [x] Support elliptical as a heart-rate activity: TRIMP load in ACWR/Banister,
   excluded from baseline, taper, decoupling and race prediction; `kind=elliptical`
   filter in `/exercises`.
@@ -391,7 +392,7 @@ NLS with fixed `tau` + ridge and a CV gate; kept as a historical reference.*
 - [x] Translate and update the user guide to English.
 - [x] Write `architecture.md` — system design, data flows and technical debt.
 - [x] Write `mathematical-model.md` — load, Banister, calibration, ACWR and prediction.
-- [ ] Write `validation.md`.
+- [x] Write `validation.md` — real-data snapshot, calibration, latency and quality gates.
 - [ ] Review exposed credentials and clean up secrets.
 - [ ] Add `LICENSE` (MIT) and `CHANGELOG.md`.
 - [ ] Tag the `v1.0.0` release.

@@ -539,7 +539,8 @@ is reserved for API boundaries and session-level models.
 ### 9.4 Performance envelope
 
 The S15 optimization work introduced batch reads, the `SampleRow` type, the
-`samples(exercise_id)` index and the revision cache. Measured locally:
+`samples(exercise_id)` index and the revision cache. Measured locally and
+reported in [`validation.md`](validation.md):
 
 - warm dashboard load: from ~5.5 s to ~0.32 s;
 - metric endpoints: below 200 ms;
@@ -895,7 +896,7 @@ Known test-boundary details:
 - [`roadmap.md`](roadmap.md) — phases, sprints, risks and delivery status.
 - [`user-guide.md`](user-guide.md) — dashboard interpretation, configuration and troubleshooting.
 - [`mathematical-model.md`](mathematical-model.md) — derivations, calibration objective and references.
-- `validation.md` — real-data validation and performance results (S16).
+- [`validation.md`](validation.md) — real-data validation, calibration diagnostics and performance.
 - `README.md` — public overview and quick start (S16).
 
 > The code remains the source of truth for exact signatures and constants. This
