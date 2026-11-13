@@ -10,11 +10,12 @@ from __future__ import annotations
 import os
 from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import Literal
 
 import httpx2
 from pydantic import TypeAdapter
 
-from athlete_stress_sim.backend.schemas.exercises import ExerciseOut, RpeInput
+from athlete_stress_sim.backend.schemas.exercises import ExerciseOut, ExerciseUpdate, RpeInput
 from athlete_stress_sim.backend.schemas.ingest import SyncResponse
 from athlete_stress_sim.backend.schemas.metrics import (
     AcwrResponse,
@@ -65,10 +66,17 @@ class MetricsClient:
         """Fetch the daily acute:chronic workload ratio series from the backend."""
         return AcwrResponse.model_validate(self._get("/metrics/acwr"))
 
-    def get_exercises(self, kind: str = "run") -> list[ExerciseOut]:
+    def get_exercises(
+        self,
+        kind: Literal["all", "gym", "run", "elliptical"] = "run",
+    ) -> list[ExerciseOut]:
         """Fetch the persisted exercises, optionally filtered by ``kind``."""
         payload = self._get(f"/exercises?kind={kind}")
         return TypeAdapter(list[ExerciseOut]).validate_python(payload)
+
+    def get_exercise(self, exercise_id: str) -> ExerciseOut:
+        """Fetch one persisted exercise."""
+        return ExerciseOut.model_validate(self._get(f"/exercises/{exercise_id}"))
 
     def sync(self) -> SyncResponse:
         """Ask the backend to download and parse new Polar sessions."""
@@ -78,6 +86,11 @@ class MetricsClient:
         """Record the session-RPE of one exercise."""
         payload = RpeInput(rpe=rpe).model_dump(mode="json")
         return ExerciseOut.model_validate(self._post(f"/exercises/{exercise_id}/rpe", payload))
+
+    def update_exercise(self, exercise_id: str, update: ExerciseUpdate) -> ExerciseOut:
+        """Update editable metadata of one exercise."""
+        payload = update.model_dump(mode="json", exclude_unset=True)
+        return ExerciseOut.model_validate(self._patch(f"/exercises/{exercise_id}", payload))
 
     def get_decoupling(self, exercise_id: str) -> DecouplingResponse:
         """Fetch the per-kilometre efficiency and aerobic decoupling of an exercise."""
@@ -134,6 +147,20 @@ class MetricsClient:
         with self._connection() as client:
             try:
                 response = client.get(url)
+            except httpx2.TransportError as exc:
+                raise MetricsClientError(f"Metrics API unreachable at {url}: {exc}") from exc
+        if response.status_code >= _HTTP_BAD_REQUEST:
+            raise MetricsClientError(
+                f"Metrics API returned {response.status_code} for {url}: {response.text}"
+            )
+        payload: object = response.json()
+        return payload
+
+    def _patch(self, path: str, body: object) -> object:
+        url = f"{self._base_url}{path}"
+        with self._connection() as client:
+            try:
+                response = client.patch(url, json=body)
             except httpx2.TransportError as exc:
                 raise MetricsClientError(f"Metrics API unreachable at {url}: {exc}") from exc
         if response.status_code >= _HTTP_BAD_REQUEST:

@@ -1,7 +1,8 @@
 """Training-load assembly: per-session load and the daily load series.
 
-Bridges the running TRIMP (Banister) and gym session-RPE metrics into a single
-internal-load series that feeds the ACWR (S7) and the Banister model (S8).
+Bridges the heart-rate TRIMP (Banister, used by running and elliptical sessions)
+and the gym session-RPE metrics into a single internal-load series that feeds the
+ACWR (S7) and the Banister model (S8).
 """
 
 from __future__ import annotations
@@ -30,13 +31,14 @@ def session_load(
     """Compute one session's internal load.
 
     Strength sessions use the session-RPE load (requires ``rpe`` and
-    ``duration_s``); endurance sessions use the Banister TRIMP integrated over
-    ``hr_samples``. Sessions without the required inputs return ``None``.
+    ``duration_s``); endurance sessions, including running and elliptical, use
+    the Banister TRIMP integrated over ``hr_samples``. Sessions without the
+    required inputs return ``None``.
 
     Args:
         sport: FIT sport value.
         sub_sport: FIT sub-sport value.
-        hr_samples: Per-second heart-rate samples (endurance sessions).
+        hr_samples: Per-second heart-rate samples (running/elliptical sessions).
         duration_s: Session duration in seconds (strength sessions).
         rpe: Session-RPE on the Borg CR-10 scale (strength sessions).
         hr_rest: Resting heart rate (bpm).

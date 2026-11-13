@@ -5,6 +5,8 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
+import pytest
+
 from athlete_stress_sim.core.etl.types import ParsedSession, Sample, SessionMetadata
 from athlete_stress_sim.core.storage.session_store import SessionStore
 
@@ -126,3 +128,23 @@ def test_query_all_samples_is_empty_without_samples(tmp_path: Path) -> None:
     store = SessionStore(tmp_path / "sessions.duckdb")
 
     assert store.query_all_samples() == {}
+
+
+def test_update_exercise_changes_metadata(tmp_path: Path) -> None:
+    store = SessionStore(tmp_path / "sessions.duckdb")
+    store.save_session("abc", _session(), "data/raw/abc.fit")
+
+    store.update_exercise("abc", {"distance_m": 10_000.0, "avg_hr": 150})
+
+    exercise = store.get_exercise("abc")
+    assert exercise is not None
+    assert exercise.distance_m == 10_000.0
+    assert exercise.avg_hr == 150
+
+
+def test_update_exercise_rejects_unknown_columns(tmp_path: Path) -> None:
+    store = SessionStore(tmp_path / "sessions.duckdb")
+    store.save_session("abc", _session(), "data/raw/abc.fit")
+
+    with pytest.raises(ValueError, match="Unsupported exercise fields"):
+        store.update_exercise("abc", {"exercise_id": "other"})

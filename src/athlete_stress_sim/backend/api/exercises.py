@@ -7,8 +7,8 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, HTTPException
 
 from athlete_stress_sim.backend.api.ingest import get_session_store
-from athlete_stress_sim.backend.schemas.exercises import ExerciseOut, RpeInput
-from athlete_stress_sim.core.etl.sports import is_strength
+from athlete_stress_sim.backend.schemas.exercises import ExerciseOut, ExerciseUpdate, RpeInput
+from athlete_stress_sim.core.etl.sports import SportKind, classify_sport
 from athlete_stress_sim.core.etl.types import Exercise
 from athlete_stress_sim.core.metrics.rpe import session_rpe_load
 from athlete_stress_sim.core.storage.session_store import SessionStore
@@ -30,6 +30,7 @@ def _to_out(exercise: Exercise, rpe: float | None) -> ExerciseOut:
         duration_s=exercise.duration_s,
         distance_m=exercise.distance_m,
         avg_hr=exercise.avg_hr,
+        max_hr=exercise.max_hr,
         rpe=rpe,
         load=load,
     )
@@ -38,15 +39,20 @@ def _to_out(exercise: Exercise, rpe: float | None) -> ExerciseOut:
 @router.get("")
 def list_exercises(
     store: SessionStoreDep,
-    kind: Literal["all", "gym", "run"] = "all",
+    kind: Literal["all", "gym", "run", "elliptical"] = "all",
 ) -> list[ExerciseOut]:
-    """List persisted exercises, optionally only running or strength sessions."""
+    """List persisted exercises, optionally filtered by activity family."""
+    requested = {
+        "gym": SportKind.STRENGTH,
+        "run": SportKind.RUNNING,
+        "elliptical": SportKind.ELLIPTICAL,
+    }.get(kind)
     result: list[ExerciseOut] = []
     for exercise, rpe in store.list_exercises_with_rpe():
-        strength = is_strength(exercise.sport, exercise.sub_sport)
-        if kind == "gym" and not strength:
-            continue
-        if kind == "run" and strength:
+        if (
+            requested is not None
+            and classify_sport(exercise.sport, exercise.sub_sport) is not requested
+        ):
             continue
         result.append(_to_out(exercise, rpe))
     return result
@@ -69,3 +75,20 @@ def set_rpe(exercise_id: str, payload: RpeInput, store: SessionStoreDep) -> Exer
         raise HTTPException(status_code=404, detail=f"Unknown exercise {exercise_id!r}.")
     store.set_rpe(exercise_id, payload.rpe)
     return _to_out(exercise, payload.rpe)
+
+
+@router.patch("/{exercise_id}")
+def update_exercise(
+    exercise_id: str,
+    payload: ExerciseUpdate,
+    store: SessionStoreDep,
+) -> ExerciseOut:
+    """Update editable metadata of one exercise and return the new state."""
+    exercise = store.get_exercise(exercise_id)
+    if exercise is None:
+        raise HTTPException(status_code=404, detail=f"Unknown exercise {exercise_id!r}.")
+    store.update_exercise(exercise_id, payload.model_dump(exclude_unset=True))
+    updated = store.get_exercise(exercise_id)
+    if updated is None:
+        raise HTTPException(status_code=404, detail=f"Unknown exercise {exercise_id!r}.")
+    return _to_out(updated, store.get_rpe(exercise_id))

@@ -1,8 +1,9 @@
 """REST endpoints exposing the training-load metrics and the simulator (S10, S13).
 
 Metrics are computed on demand from the persisted DuckDB sessions: the Banister
-TRIMP for endurance sessions and the session-RPE load for strength sessions feed
-the ACWR (``RF-04``) and the fitness-fatigue model (``RF-03``). ``POST /simulate``
+TRIMP for heart-rate sessions (running and elliptical) and the session-RPE load
+for strength sessions feed the ACWR (``RF-04``) and the fitness-fatigue model
+(``RF-03``). Running-only metrics ignore elliptical sessions. ``POST /simulate``
 runs the Banister model forward over a caller-provided daily-load series, while
 ``POST /simulate/taper`` merges planned sessions with the history (``RF-05.2``),
 ``POST /simulate/taper/plan`` generates a tapering plan up to race day (``S14``),
@@ -38,7 +39,7 @@ from athlete_stress_sim.backend.schemas.metrics import (
     TaperSimulationResponse,
     TaperWeekSummary,
 )
-from athlete_stress_sim.core.etl.sports import is_strength
+from athlete_stress_sim.core.etl.sports import is_running, is_strength
 from athlete_stress_sim.core.etl.types import Exercise, SampleLike
 from athlete_stress_sim.core.metrics.acwr import (
     DEFAULT_ACUTE_DAYS,
@@ -156,7 +157,7 @@ def _assemble_performance(data: _SessionData, dates: list[date]) -> dict[int, fl
     """Collect the efficiency factor of every running session keyed by day index."""
     sessions: list[tuple[date, float | None]] = []
     for exercise, _ in data.exercises:
-        if exercise.start_time is None or is_strength(exercise.sport, exercise.sub_sport):
+        if exercise.start_time is None or not is_running(exercise.sport, exercise.sub_sport):
             continue
         samples = data.samples.get(exercise.exercise_id, [])
         sessions.append((exercise.start_time.date(), session_efficiency(samples)))
@@ -179,7 +180,7 @@ def _assemble_running_sessions(
     """Collect running sessions with distance, duration and RPE for the baseline."""
     sessions: list[tuple[date, float, float | None, float | None]] = []
     for exercise, rpe in exercises:
-        if exercise.start_time is None or is_strength(exercise.sport, exercise.sub_sport):
+        if exercise.start_time is None or not is_running(exercise.sport, exercise.sub_sport):
             continue
         if exercise.distance_m is None or exercise.distance_m <= 0.0:
             continue

@@ -6,9 +6,11 @@ import json
 from collections.abc import Callable
 from datetime import date
 
+import dash_mantine_components as dmc
 import httpx2
 import pytest
 
+from athlete_stress_sim.backend.schemas.exercises import ExerciseUpdate
 from athlete_stress_sim.backend.schemas.metrics import PlannedSession, TaperPlanRequest
 from athlete_stress_sim.backend.schemas.prediction import RacePredictionRequest
 from athlete_stress_sim.core.metrics.race_prediction import PredictionModel
@@ -405,3 +407,157 @@ def test_metrics_client_post_taper_error() -> None:
 
 def test_frontend_app_imports() -> None:
     assert frontend_app.app.title == "Athlete Stress Sim"
+
+
+def _walk(component: object):
+    yield component
+    children = getattr(component, "children", None)
+    if isinstance(children, (list, tuple)):
+        for child in children:
+            if hasattr(child, "_prop_names"):
+                yield from _walk(child)
+    elif hasattr(children, "_prop_names"):
+        yield from _walk(children)
+
+
+def test_frontend_layout_has_three_tabs_and_shared_ids() -> None:
+    components = list(_walk(frontend_app.app.layout))
+
+    tabs = [component for component in components if isinstance(component, dmc.Tabs)]
+    tab_values = {component.value for component in components if isinstance(component, dmc.TabsTab)}
+    ids = {
+        component.id for component in components if isinstance(getattr(component, "id", None), str)
+    }
+
+    assert tabs and tabs[0].value == "today"
+    assert {"today", "trends", "plan"} <= tab_values
+    assert {"taper", "simulator", "predictor"} <= tab_values
+    assert {
+        "status-panel",
+        "acwr-risk-panel",
+        "freshness-panel",
+        "quick-stats",
+        "fitness-panel",
+        "fitness-chart",
+        "recent-sessions",
+        "sessions-rpe-open",
+        "edit-session-select",
+        "edit-session-open",
+        "session-edit-modal",
+        "edit-session-save",
+        "race-baseline-btn",
+        "sim-baseline-btn",
+        "refresh-btn",
+        "rpe-pending-btn",
+        "rpe-pending-text",
+        "rpe-card-open",
+        "dashboard-alert",
+        "sim-chart",
+        "race-chart",
+    } <= ids
+
+
+def test_frontend_uses_the_shared_mantine_theme() -> None:
+    layout = frontend_app.app.layout
+
+    assert layout.theme["primaryColor"] == "cyan"
+    assert layout.theme["defaultRadius"] == "md"
+
+
+def _dashboard_handler(empty: bool = False) -> Handler:
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        if request.url.path == "/metrics/banister":
+            payload = (
+                {
+                    "dates": [],
+                    "fitness": [],
+                    "fatigue": [],
+                    "performance": [],
+                    "freshness": [],
+                }
+                if empty
+                else {
+                    "dates": ["2026-10-03", "2026-10-04"],
+                    "fitness": [10.0, 12.0],
+                    "fatigue": [4.0, 5.0],
+                    "performance": [6.0, 7.0],
+                    "freshness": [6.0, 7.0],
+                }
+            )
+            return httpx2.Response(200, json=payload)
+        if request.url.path == "/metrics/acwr":
+            return httpx2.Response(
+                200,
+                json={"points": []}
+                if empty
+                else {
+                    "points": [
+                        {
+                            "date": "2026-10-04",
+                            "acute": 1.0,
+                            "chronic": 1.0,
+                            "acwr": 1.0,
+                            "zone": "sweet_spot",
+                        }
+                    ]
+                },
+            )
+        if request.url.path == "/exercises":
+            return httpx2.Response(200, json=[])
+        raise AssertionError(f"Unexpected request: {request.url}")
+
+    return handler
+
+
+def test_load_dashboard_builds_today_panels() -> None:
+    dashboard = frontend_app._load_dashboard(_client(_dashboard_handler()), None)
+
+    assert len(dashboard) == 8
+    assert dashboard[-1] is None
+
+
+def test_load_dashboard_returns_no_data_alert() -> None:
+    dashboard = frontend_app._load_dashboard(_client(_dashboard_handler(empty=True)), None)
+
+    alert = dashboard[-1]
+    assert isinstance(alert, dmc.Alert)
+    assert alert.title == "No data"
+
+
+def test_empty_dashboard_returns_offline_alert() -> None:
+    dashboard = frontend_app._empty_dashboard()
+
+    alert = dashboard[-1]
+    assert isinstance(alert, dmc.Alert)
+    assert alert.title == "Backend offline"
+
+
+def test_metrics_client_updates_exercise() -> None:
+    captured: dict[str, object] = {}
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        assert request.method == "PATCH"
+        assert request.url.path == "/exercises/run1"
+        captured.update(json.loads(request.content))
+        return httpx2.Response(
+            200,
+            json={"exercise_id": "run1", "distance_m": 10_000.0, "avg_hr": 150},
+        )
+
+    updated = _client(handler).update_exercise(
+        "run1", ExerciseUpdate(distance_m=10_000.0, avg_hr=150)
+    )
+
+    assert updated.distance_m == pytest.approx(10_000.0)
+    assert captured == {"distance_m": 10_000.0, "avg_hr": 150}
+
+
+def test_metrics_client_gets_one_exercise() -> None:
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        assert request.url.path == "/exercises/run1"
+        return httpx2.Response(200, json={"exercise_id": "run1", "avg_hr": 150})
+
+    exercise = _client(handler).get_exercise("run1")
+
+    assert exercise.exercise_id == "run1"
+    assert exercise.avg_hr == 150

@@ -11,8 +11,15 @@ from athlete_stress_sim.backend.schemas.exercises import ExerciseOut
 from athlete_stress_sim.frontend.components.rpe import (
     pending_gym_sessions,
     rpe_modal,
+    rpe_pending_card,
+    rpe_pending_message,
     rpe_pending_style,
     rpe_session_options,
+)
+from athlete_stress_sim.frontend.components.sessions import (
+    recent_sessions_panel,
+    session_edit_modal,
+    session_editor_card,
 )
 from athlete_stress_sim.frontend.components.simulator import race_taper_panel, simulator_panel
 
@@ -110,3 +117,43 @@ def test_race_taper_form_starts_empty() -> None:
         "race-weeks",
     ):
         assert getattr(components[component_id], "value", None) is None
+
+
+def test_rpe_pending_message_describes_pending_count() -> None:
+    assert rpe_pending_message(0) == "All gym sessions have RPE logged."
+    assert rpe_pending_message(1).startswith("1 gym session needs")
+    assert "3 gym sessions" in rpe_pending_message(3)
+
+
+def test_rpe_pending_card_has_a_review_action() -> None:
+    ids = set(_by_id(rpe_pending_card()))
+
+    assert {"rpe-pending-text", "rpe-card-open"} <= ids
+
+
+def test_recent_sessions_panel_has_review_action() -> None:
+    components = _by_id(recent_sessions_panel([_exercise("gym1"), _exercise("gym2", rpe=6.0)]))
+
+    assert components["sessions-rpe-open"].disabled is False
+
+
+def test_recent_sessions_panel_without_pending_disables_action() -> None:
+    components = _by_id(recent_sessions_panel([_exercise("gym1", rpe=6.0)]))
+
+    assert components["sessions-rpe-open"].disabled is True
+
+
+def test_session_editor_card_and_modal_have_ids() -> None:
+    card_ids = set(_by_id(session_editor_card()))
+    modal_ids = set(_by_id(session_edit_modal()))
+
+    assert {"edit-session-select", "edit-session-open", "edit-session-status"} <= card_ids
+    assert {
+        "edit-start-time",
+        "edit-distance",
+        "edit-duration",
+        "edit-avg-hr",
+        "edit-max-hr",
+        "edit-session-save",
+        "edit-session-cancel",
+    } <= modal_ids

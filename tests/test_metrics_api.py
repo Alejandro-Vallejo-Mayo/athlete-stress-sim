@@ -180,6 +180,52 @@ def test_metrics_refresh_after_rpe_edit(tmp_path: Path) -> None:
     assert after != before
 
 
+_ELLIPTICAL_START = datetime(2026, 10, 6, 18, 0, 0)
+_ELLIPTICAL_HR = 140
+
+
+def _elliptical_session() -> ParsedSession:
+    samples = [
+        Sample(
+            timestamp=_ELLIPTICAL_START + timedelta(seconds=i),
+            elapsed_s=float(i),
+            hr=_ELLIPTICAL_HR,
+            is_valid=True,
+        )
+        for i in range(_RUN_SECONDS)
+    ]
+    return ParsedSession(
+        metadata=SessionMetadata(
+            sport="fitness_equipment",
+            sub_sport="elliptical",
+            start_time=_ELLIPTICAL_START,
+            duration_s=float(_RUN_SECONDS),
+            distance_m=5000.0,
+        ),
+        samples=samples,
+    )
+
+
+def test_elliptical_contributes_load_but_not_running_baseline(tmp_path: Path) -> None:
+    store = SessionStore(tmp_path / "elliptical.duckdb")
+    store.save_session("elli1", _elliptical_session(), "data/raw/elli1.fit")
+    store.set_rpe("elli1", 6.0)
+    client = _client_for(store)
+    try:
+        trimp_response = client.get("/metrics/trimp/elli1")
+        acwr = client.get("/metrics/acwr")
+        baseline = client.get("/metrics/running-baseline")
+    finally:
+        app.dependency_overrides.clear()
+
+    a, b = trimp_coefficients(physiology.sex)
+    ratio = (_ELLIPTICAL_HR - physiology.hr_rest) / (physiology.hr_max - physiology.hr_rest)
+    expected = (_RUN_SECONDS / 60.0) * ratio * a * math.exp(b * ratio)
+    assert trimp_response.json()["load"] == pytest.approx(expected)
+    assert acwr.json()["points"][0]["chronic"] > 0.0
+    assert baseline.json() is None
+
+
 def test_simulate_returns_trajectory(client: TestClient) -> None:
     response = client.post(
         "/simulate",

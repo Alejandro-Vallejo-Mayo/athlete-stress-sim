@@ -101,7 +101,27 @@ def test_race_predictor_panel_defaults() -> None:
 
     assert components["race-distance-preset"].value == "half"
     assert components["race-distance-custom"].style == {"display": "none"}
-    assert "race-model" not in components
+    assert components["race-model"].value == "auto"
+    assert components["race-exponent"].value == pytest.approx(1.06)
     assert "race-predict" in components
     assert "race-result-time" in components
     assert "race-efforts-list" in components
+
+
+def test_effort_label_always_includes_fitness() -> None:
+    effort = EffortOut(
+        distance_km=5.0,
+        time_s=1600.0,
+        day=date(2026, 10, 1),
+        tier=EffortTier.HARD,
+        fitness_factor=1.0,
+    )
+
+    assert "fitness x1.00" in effort_label(effort)
+
+
+def test_race_predictor_panel_has_no_manual_reference_inputs() -> None:
+    components = _by_id(race_predictor_panel())
+
+    assert "race-reference-distance" not in components
+    assert "race-reference-minutes" not in components

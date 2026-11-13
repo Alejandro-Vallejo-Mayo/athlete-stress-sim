@@ -29,7 +29,7 @@ from athlete_stress_sim.backend.schemas.prediction import (
     RacePredictionResponse,
     RaceReference,
 )
-from athlete_stress_sim.core.etl.sports import is_strength
+from athlete_stress_sim.core.etl.sports import is_running
 from athlete_stress_sim.core.etl.types import SampleLike
 from athlete_stress_sim.core.metrics.load import daily_load_series
 from athlete_stress_sim.core.metrics.race_prediction import (
@@ -58,7 +58,7 @@ def _running_sessions(data: _SessionData) -> list[tuple[date, Sequence[SampleLik
     exercises = [
         exercise
         for exercise, _ in data.exercises
-        if exercise.start_time is not None and not is_strength(exercise.sport, exercise.sub_sport)
+        if exercise.start_time is not None and is_running(exercise.sport, exercise.sub_sport)
     ]
     if not exercises:
         return []

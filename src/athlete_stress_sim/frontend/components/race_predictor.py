@@ -9,12 +9,11 @@ import dash_mantine_components as dmc
 from dash import html
 
 from athlete_stress_sim.backend.schemas.prediction import EffortOut
-from athlete_stress_sim.core.metrics.race_prediction import format_duration
+from athlete_stress_sim.core.metrics.race_prediction import PredictionModel, format_duration
+from athlete_stress_sim.frontend.theme import COLORS, surface_style
 
 HALF_MARATHON_KM = 21.0975
 """Default target distance in the race predictor."""
-
-_FITNESS_EPS = 1e-6
 
 _DISTANCE_PRESETS: dict[str, float | None] = {
     "5k": 5.0,
@@ -33,6 +32,16 @@ def distance_options() -> list[dict[str, str]]:
         {"value": "half", "label": "Half marathon"},
         {"value": "marathon", "label": "Marathon"},
         {"value": "custom", "label": "Custom"},
+    ]
+
+
+def model_options() -> list[dict[str, str]]:
+    """Return the prediction model options, with automatic selection first."""
+    return [
+        {"value": PredictionModel.AUTO.value, "label": "Auto (recommended)"},
+        {"value": PredictionModel.RIEGEL.value, "label": "Riegel"},
+        {"value": PredictionModel.CRITICAL_SPEED.value, "label": "Critical speed"},
+        {"value": PredictionModel.HR_EXTRAPOLATION.value, "label": "HR extrapolation"},
     ]
 
 
@@ -72,20 +81,24 @@ def format_pace(seconds_per_km: float | None) -> str:
 def effort_label(effort: EffortOut) -> str:
     """Build a compact label for one detected effort."""
     hr = "HR n/a" if effort.relative_hr is None else f"{effort.relative_hr:.0%} HRR"
-    label = (
+    return (
         f"{effort.distance_km:.2f} km · {format_duration(effort.time_s)} · "
-        f"{hr} · {effort.tier.value}"
+        f"{hr} · {effort.tier.value} · fitness x{effort.fitness_factor:.2f}"
     )
-    if abs(effort.fitness_factor - 1.0) > _FITNESS_EPS:
-        label += f" · fitness x{effort.fitness_factor:.2f}"
-    return label
 
 
 def effort_rows(efforts: Sequence[EffortOut]) -> list[dmc.Text]:
     """Render the detected efforts as compact text rows."""
     if not efforts:
         return [dmc.Text("No best efforts detected yet.", c="dimmed", size="sm")]
-    return [dmc.Text(effort_label(effort), size="sm") for effort in efforts]
+    return [
+        dmc.Text(
+            effort_label(effort),
+            size="sm",
+            style={"fontVariantNumeric": "tabular-nums", "color": COLORS["text_muted"]},
+        )
+        for effort in efforts
+    ]
 
 
 def note_rows(notes: Sequence[str]) -> list[dmc.Text]:
@@ -94,18 +107,63 @@ def note_rows(notes: Sequence[str]) -> list[dmc.Text]:
 
 
 def race_predictor_panel() -> dmc.Paper:
-    """Build the race predictor form and result card."""
+    """Build the race predictor with a result-first layout and advanced inputs."""
     return dmc.Paper(
         dmc.Stack(
             [
-                dmc.Text("Race predictor", fw=600, size="lg"),
-                dmc.Text(
-                    "Estimates your potential race time from your best efforts. "
-                    "Easy runs are weighted through heart rate and efficiency, not "
-                    "raw pace.",
-                    c="dimmed",
-                    size="sm",
+                dmc.Stack(
+                    [
+                        dmc.Text(
+                            "Race predictor",
+                            fw=600,
+                            size="lg",
+                            style={"color": COLORS["text"]},
+                        ),
+                        dmc.Text(
+                            "Estimates your potential race time from your best efforts. "
+                            "Easy runs are weighted through heart rate and efficiency, not "
+                            "raw pace.",
+                            size="sm",
+                            style={"color": COLORS["text_muted"]},
+                        ),
+                    ],
+                    gap=0,
                 ),
+                dmc.Text(
+                    "Prediction",
+                    size="xs",
+                    fw=600,
+                    tt="uppercase",
+                    style={"color": COLORS["text_muted"], "letterSpacing": "0.08em"},
+                ),
+                dmc.Group(
+                    [
+                        dmc.Text(
+                            id="race-result-time",
+                            fw=700,
+                            style={"fontSize": "2rem", "color": COLORS["text"]},
+                            children="—",
+                        ),
+                        dmc.Text(
+                            id="race-result-pace",
+                            fw=700,
+                            size="lg",
+                            style={"color": COLORS["text"]},
+                            children="—",
+                        ),
+                    ],
+                    gap="xl",
+                    align="baseline",
+                    wrap="wrap",
+                ),
+                dmc.Text(
+                    id="race-result-range",
+                    size="sm",
+                    style={"color": COLORS["text_muted"]},
+                    children="Choose a distance and press Predict.",
+                ),
+                dmc.Text(id="race-result-meta", size="sm", style={"color": COLORS["text_muted"]}),
+                dmc.Stack(id="race-result-notes", gap=2),
                 dmc.Group(
                     [
                         dmc.Select(
@@ -125,49 +183,66 @@ def race_predictor_panel() -> dmc.Paper:
                             style={"display": "none"},
                             w=180,
                         ),
+                        dmc.Button("Predict", id="race-predict", variant="filled", w=160),
                     ],
                     align="flex-end",
                     gap="sm",
+                    wrap="wrap",
                 ),
-                dmc.Text(
-                    "The model is selected automatically (Riegel or critical speed).",
-                    c="dimmed",
-                    size="xs",
-                ),
-                dmc.Text("Optional race/time-trial reference", fw=600, size="sm"),
-                dmc.Group(
+                dmc.Accordion(
                     [
-                        dmc.NumberInput(
-                            id="race-reference-distance",
-                            label="Reference distance (km)",
-                            min=1.0,
-                            max=200.0,
-                            step=0.1,
-                            w=180,
-                        ),
-                        dmc.NumberInput(
-                            id="race-reference-minutes",
-                            label="Reference time (min)",
-                            min=1.0,
-                            step=0.1,
-                            w=180,
-                        ),
+                        dmc.AccordionItem(
+                            [
+                                dmc.AccordionControl("Advanced model"),
+                                dmc.AccordionPanel(
+                                    dmc.Stack(
+                                        [
+                                            dmc.Select(
+                                                id="race-model",
+                                                label="Model",
+                                                data=model_options(),
+                                                value=PredictionModel.AUTO.value,
+                                                clearable=False,
+                                            ),
+                                            dmc.NumberInput(
+                                                id="race-exponent",
+                                                label="Riegel exponent",
+                                                min=0.5,
+                                                max=1.5,
+                                                step=0.01,
+                                                value=1.06,
+                                            ),
+                                            dmc.Text(
+                                                "Auto uses critical speed when possible, then "
+                                                "Riegel, then heart-rate extrapolation.",
+                                                size="xs",
+                                                style={"color": COLORS["text_muted"]},
+                                            ),
+                                        ],
+                                        gap="sm",
+                                    )
+                                ),
+                            ],
+                            value="advanced",
+                        )
                     ],
-                    align="flex-end",
-                    gap="sm",
                 ),
-                dmc.Button("Predict", id="race-predict", variant="filled", w=160),
-                dmc.Text(id="race-result-time", fw=700, size="xl"),
-                dmc.Text(id="race-result-pace", fw=700, size="lg"),
-                dmc.Text(id="race-result-range", c="dimmed", size="sm"),
-                dmc.Text(id="race-result-meta", c="dimmed", size="sm"),
-                dmc.Stack(id="race-result-notes", gap=2),
-                dmc.Text("Detected best efforts", fw=600, size="sm"),
-                html.Div(id="race-efforts-list"),
+                dmc.Accordion(
+                    [
+                        dmc.AccordionItem(
+                            [
+                                dmc.AccordionControl("Efforts used"),
+                                dmc.AccordionPanel(html.Div(id="race-efforts-list")),
+                            ],
+                            value="efforts",
+                        )
+                    ],
+                ),
             ],
-            gap="sm",
+            gap="md",
         ),
         p="lg",
         radius="md",
         withBorder=True,
+        style=surface_style(),
     )
