@@ -297,9 +297,10 @@ athleta-stress-sim/
 ├── Makefile                     # Targets de desarrollo (install, lint, test, run, docker)
 ├── pyproject.toml               # Configuración única de dependencias y tooling
 ├── uv.lock                      # Lockfile reproducible
-├── PRD.md
-├── README.md
-└── ROADMAP.md
+├── docs/
+│   ├── product-requirements.md
+│   └── roadmap.md
+└── README.md
 ```
 
 # 6. Plan de Desarrollo por Hitos (4 Meses)

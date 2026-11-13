@@ -6,7 +6,7 @@
 > - **Horizonte:** 4 meses (16 semanas) · 1 cuatrimestre
 > - **Usuario cero:** preparación personal de primera Media Maratón (3 días carrera + 3 días gimnasio)
 > - **Dispositivo:** Polar Ignite (Polar AccessLink API)
-> - **Fuente de requisitos:** `athlete-stress-sim-PRD.md` (v1.0.0)
+> - **Fuente de requisitos:** `product-requirements.md` (v1.0.0)
 > - **Estado:** En planificación
 
 ---

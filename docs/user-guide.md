@@ -2,7 +2,7 @@
 
 Esta guía explica qué calcula **Athlete Stress Sim**, qué representa cada panel del dashboard y
 cómo leer sus gráficas. Está pensada para usar la aplicación, no para sustituir al
-[PRD](../athlete-stress-sim-PRD.md) ni al [ROADMAP](../ROADMAP.md), que son la referencia de
+[PRD](product-requirements.md) ni al [ROADMAP](roadmap.md), que son la referencia de
 producto y planificación.
 
 > No es consejo médico. Las métricas son estimaciones de carga interna y fatiga; úsalas para
