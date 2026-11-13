@@ -481,8 +481,8 @@ takes plain inputs (samples, dates, load lists, parameters) and returns plain
 outputs. This is what makes the test suite fast and deterministic.
 
 The calibration path is the most delicate part of the system. It is described
-fully in the mathematical model document; architecturally, it has three
-important properties:
+fully in [`mathematical-model.md`](mathematical-model.md); architecturally, it has
+three important properties:
 
 - `tau_1` and `tau_2` are fixed at the priors, so the fit is a bounded linear
   least-squares problem rather than a jointly identified nonlinear one.
@@ -894,7 +894,7 @@ Known test-boundary details:
 - [`product-requirements.md`](product-requirements.md) — product scope, requirement IDs and acceptance criteria.
 - [`roadmap.md`](roadmap.md) — phases, sprints, risks and delivery status.
 - [`user-guide.md`](user-guide.md) — dashboard interpretation, configuration and troubleshooting.
-- `mathematical-model.md` — detailed derivations, calibration objective and references (S16).
+- [`mathematical-model.md`](mathematical-model.md) — derivations, calibration objective and references.
 - `validation.md` — real-data validation and performance results (S16).
 - `README.md` — public overview and quick start (S16).
 

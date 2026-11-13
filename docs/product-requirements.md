@@ -795,8 +795,8 @@ The project is considered complete when:
 - [`roadmap.md`](roadmap.md) — phases, sprints, acceptance criteria and risks.
 - [`user-guide.md`](user-guide.md) — dashboard interpretation and endpoint reference.
 - [`architecture.md`](architecture.md) — system design, data flows and technical debt.
+- [`mathematical-model.md`](mathematical-model.md) — derivations, calibration and references.
 - `README.md` — public project overview and quick start (S16).
-- `mathematical-model.md` — detailed derivations and references (S16).
 - `validation.md` — real-data validation and performance results (S16).
 
 > The S16 technical deep dives live under `docs/` and are linked from the public

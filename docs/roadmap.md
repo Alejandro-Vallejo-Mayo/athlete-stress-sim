@@ -390,7 +390,8 @@ NLS with fixed `tau` + ridge and a CV gate; kept as a historical reference.*
 - [x] Translate the roadmap to English and update it to the as-built state.
 - [x] Translate and update the user guide to English.
 - [x] Write `architecture.md` — system design, data flows and technical debt.
-- [ ] Write `mathematical-model.md` and `validation.md`.
+- [x] Write `mathematical-model.md` — load, Banister, calibration, ACWR and prediction.
+- [ ] Write `validation.md`.
 - [ ] Review exposed credentials and clean up secrets.
 - [ ] Add `LICENSE` (MIT) and `CHANGELOG.md`.
 - [ ] Tag the `v1.0.0` release.

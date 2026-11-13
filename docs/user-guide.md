@@ -5,7 +5,8 @@
 > This guide explains what Athlete Stress Sim calculates, what each dashboard
 > panel represents and how to read its charts. It is written for using the
 > application, not for replacing the [PRD](product-requirements.md) or the
-> [roadmap](roadmap.md), which are the product and planning references.
+> [roadmap](roadmap.md), which are the product and planning references. The full
+> derivations live in [`mathematical-model.md`](mathematical-model.md).
 >
 > **This is not medical advice.** The metrics are estimates of internal load and
 > fatigue. Use them to detect trends, not to diagnose injuries or replace a
