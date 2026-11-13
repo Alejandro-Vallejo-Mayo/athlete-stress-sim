@@ -1,338 +1,494 @@
-# Roadmap Maestro — Athleta-Stress-Sim
+# Master Roadmap — Athlete Stress Sim
 
-> **Documento rector del desarrollo.** Toda tarea de implementación debe poder trazarse hasta una de las semanas y sus criterios de aceptación aquí definidos.
+> **Development control document.** Every implementation task must trace back to
+> one of the weeks and acceptance criteria defined here.
 >
-> - **Proyecto:** Biomechanical Fatigue & Load Management Optimizer
-> - **Horizonte:** 4 meses (16 semanas) · 1 cuatrimestre
-> - **Usuario cero:** preparación personal de primera Media Maratón (3 días carrera + 3 días gimnasio)
-> - **Dispositivo:** Polar Ignite (Polar AccessLink API)
-> - **Fuente de requisitos:** `product-requirements.md` (v1.0.0)
-> - **Estado:** En planificación
+> - **Project:** Biomechanical Fatigue & Load Management Optimizer
+> - **Horizon:** 4 months (16 weeks) · 1 semester
+> - **User zero:** personal preparation for a first half marathon (3 running days + 3 gym days)
+> - **Device:** Polar Ignite (Polar AccessLink API)
+> - **Requirement source:** [`product-requirements.md`](product-requirements.md) (v1.1.0)
+> - **Status:** S1–S15 delivered · S16 in progress
 
 ---
 
-## Índice
+## Table of contents
 
-1. [Cómo usar este documento](#1-cómo-usar-este-documento)
-2. [Leyenda de seguimiento](#2-leyenda-de-seguimiento)
-3. [Objetivos y criterios de éxito](#3-objetivos-y-criterios-de-éxito)
-4. [Visión general de fases](#4-visión-general-de-fases)
-5. [Mapa de dependencias](#5-mapa-de-dependencias)
-6. [Plan semanal (Sprints)](#6-plan-semanal-sprints)
-7. [Criterios de aceptación por fase (Definition of Done)](#7-criterios-de-aceptación-por-fase)
-8. [Riesgos y mitigaciones](#8-riesgos-y-mitigaciones)
-9. [Priorización (MoSCoW)](#9-priorización-moscow)
-10. [Cómo se actualiza este roadmap](#10-cómo-se-actualiza-este-roadmap)
-
----
-
-## 1. Cómo usar este documento
-
-- El desarrollo se organiza en **4 fases** (una por mes) y **16 sprints semanales**.
-- Cada sprint lista **objetivos**, **tareas** y **criterios de aceptación** concretos y verificables.
-- Cada tarea se referencia contra un requisito del PRD (`RF-xx` / `RNF-xx`) para mantener trazabilidad.
-- Al final de cada sprint se marca la casilla correspondiente y se registra el estado real en `git`.
-- Este documento **no sustituye** al PRD: el PRD define el *qué* y el *porqué*; este roadmap define el *cómo*, *cuándo* y *en qué orden*.
-
-### 1.1 Convenciones y stack de desarrollo
-
-- **Gestión de dependencias y entorno:** [`uv`](https://docs.astral.sh/uv/) con `pyproject.toml` (PEP 621) y `uv.lock` bloqueado. Nunca se usa `pip`/`requirements.txt` directamente; el entorno se crea con `uv sync`.
-- **Layout:** `src/athlete_stress_sim/` (paquete único, *src layout*) con submódulos `backend/`, `core/` y `frontend/`.
-- **Lint y formato:** `ruff` (linter + formatter). **Tipado:** `mypy`. **Tests:** `pytest` + `pytest-cov`.
-- **Git hooks:** `pre-commit` (ruff, ruff-format, mypy, end-of-file-fixer, trailing-whitespace, check-yaml, check-toml, detect-private-key).
-- **Orquestación:** `Makefile` como única puerta de entrada a los comandos; el CI de GitHub Actions invoca `make lint` y `make test`, nunca comandos sueltos.
+1. [How to use this document](#1-how-to-use-this-document)
+2. [Tracking legend](#2-tracking-legend)
+3. [Objectives and success criteria](#3-objectives-and-success-criteria)
+4. [Phase overview](#4-phase-overview)
+5. [Dependency map](#5-dependency-map)
+6. [Weekly plan (sprints)](#6-weekly-plan-sprints)
+7. [Acceptance criteria by phase (Definition of Done)](#7-acceptance-criteria-by-phase-definition-of-done)
+8. [Risks and mitigations](#8-risks-and-mitigations)
+9. [Prioritization (MoSCoW)](#9-prioritization-moscow)
+10. [How this roadmap is updated](#10-how-this-roadmap-is-updated)
 
 ---
 
-## 2. Leyenda de seguimiento
+## 1. How to use this document
 
-| Marca | Significado |
-|-------|-------------|
-| `[ ]` | Pendiente |
-| `[~]` | En progreso |
-| `[x]` | Completado |
-| `[!]` | Bloqueado |
+- Development is organized into **4 phases** (one per month) and **16 weekly
+  sprints**.
+- Each sprint lists concrete, verifiable **objectives**, **tasks** and
+  **acceptance criteria**.
+- Every task references a PRD requirement (`RF-xx` / `RNF-xx`) to preserve
+  traceability.
+- At the end of each sprint, the corresponding checkbox is updated and the real
+  state is recorded in `git`.
+- This document **does not replace** the PRD: the PRD defines the *what* and the
+  *why*; this roadmap defines the *how*, *when* and *in what order*.
 
-> Cada hito de fase tiene una casilla maestra en `## 7. Criterios de aceptación por fase`.
+### 1.1 Conventions and development stack
 
----
-
-## 3. Objetivos y criterios de éxito
-
-**Objetivo final:** una plataforma end-to-end que ingeste telemetría Polar, calcule carga (TRIMP), modele Fitness-Fatiga (EDO + calibración NLS), evalúe riesgo de lesión (ACWR) y ofrezca un dashboard interactivo con simulador de *tapering* para llegar óptimamente a la Media Maratón.
-
-**Criterios de éxito (medibles):**
-
-1. Los 5 requisitos funcionales (`RF-01` → `RF-05`) implementados y verificados con tests.
-2. Los 4 requisitos no funcionales (`RNF-01` → `RNF-04`) cumplidos.
-3. Cobertura de tests ≥ 80 % en `src/athlete_stress_sim/core` (métricas + modelos).
-4. Simulación EDO < 0.5 s (`RNF-02`).
-5. Sistema desplegado con `docker compose up` y usable en rutina real durante al menos 2 semanas.
-6. `README.md` público en inglés con matemática (LaTeX), diagramas y capturas reales (portfolio).
-
----
-
-## 4. Visión general de fases
-
-| Fase | Mes | Semanas | Nombre | Entregable principal |
-|------|-----|---------|--------|----------------------|
-| **F0** | 1 | S1–S4 | Fundamentos, Polar y DuckDB | Telemetría cruda persistida |
-| **F1** | 2 | S5–S9 | Motor Fisiológico | TRIMP, ACWR, EDO y calibración funcionales |
-| **F2** | 3 | S10–S13 | API + Dashboard | Dashboard interactivo + simulador |
-| **F3** | 4 | S14–S16 | Uso real, validación y portfolio | Sistema validado + README público |
+- **Dependency and environment management:** [`uv`](https://docs.astral.sh/uv/)
+  with `pyproject.toml` (PEP 621) and a locked `uv.lock`. `pip` and
+  `requirements.txt` are never used directly; the environment is created with
+  `uv sync`.
+- **Layout:** `src/athlete_stress_sim/` (single package, *src layout*) with the
+  `backend/`, `core/` and `frontend/` subpackages.
+- **Lint and format:** `ruff`. **Typing:** `mypy`. **Tests:** `pytest` +
+  `pytest-cov`.
+- **Git hooks:** `pre-commit` (ruff, ruff-format, mypy, end-of-file-fixer,
+  trailing-whitespace, check-yaml, check-toml, detect-private-key).
+- **Orchestration:** the `Makefile` is the single entry point for commands;
+  GitHub Actions CI runs `make lint`, `make typecheck` and `make test-cov`, never
+  ad-hoc commands.
+- **Python:** 3.12 pinned in `.python-version`; `requires-python` also allows
+  3.11.
 
 ---
 
-## 5. Mapa de dependencias
+## 2. Tracking legend
+
+| Mark | Meaning |
+| --- | --- |
+| `[ ]` | Pending |
+| `[~]` | In progress |
+| `[x]` | Completed |
+| `[!]` | Blocked |
+
+> Every phase milestone has a master checkbox in
+> `## 7. Acceptance criteria by phase`.
+
+---
+
+## 3. Objectives and success criteria
+
+**Final objective:** an end-to-end platform that ingests Polar telemetry,
+quantifies training load (TRIMP/sRPE), models fitness-fatigue (ODE + NLS
+calibration), estimates injury risk (ACWR) and provides an interactive dashboard
+with a tapering simulator and race predictor to arrive at the half marathon in
+good form.
+
+**Measurable success criteria:**
+
+1. The five functional requirement groups (`RF-01` → `RF-05`) are implemented
+   and verified with tests.
+2. The four non-functional requirements (`RNF-01` → `RNF-04`) are met.
+3. Test coverage is at least **80 %** over `src/athlete_stress_sim/core`
+   (metrics and models).
+4. ODE simulation runs in **less than 0.5 s** (`RNF-02`).
+5. The system is deployable with `docker compose up` and was used in a real
+   routine for at least **2 weeks**.
+6. The public `README.md` is written in English with LaTeX mathematics,
+   architecture diagrams and real dashboard captures (portfolio).
+7. Calibration behavior is reported honestly: with the available real-data
+   window, the quality gate may not be passed and the system falls back to the
+   physiological priors.
+
+---
+
+## 4. Phase overview
+
+| Phase | Month | Weeks | Name | Main deliverable | Status |
+| --- | --- | --- | --- | --- | --- |
+| **F0** | 1 | S1–S4 | Foundations, Polar and DuckDB | Raw telemetry persisted | Done |
+| **F1** | 2 | S5–S9 | Physiological engine | TRIMP, ACWR, ODE and calibration functional | Done |
+| **F2** | 3 | S10–S13 | API + dashboard | Interactive dashboard and simulator | Done |
+| **F3** | 4 | S14–S16 | Real use, validation and portfolio | Validated system + public documentation | In progress |
+
+### 4.1 Status summary
+
+- **S1–S15:** delivered. S14 keeps one non-blocking maintenance item (minor
+  bug fixes from real use); no blocking defects were found.
+- **S16:** in progress (English documentation set, screenshot integration,
+  secret review, license/changelog and release tag).
+- **Release:** `v1.0.0` is pending until the documentation and release checklist
+  are closed.
+
+---
+
+## 5. Dependency map
 
 ```text
 S1 Config/Docker ──► S2 OAuth2 ──► S3 AccessLink ──► S4 Parser+DuckDB
                                                          │
                                                          ▼
-                              S5 TRIMP carrera ──► S6 TRIMP gym ──► S7 ACWR
+                              S5 Running TRIMP ──► S6 Gym TRIMP ──► S7 ACWR
                                                                         │
                                                                         ▼
-                                                        S8 EDO Banister ──► S9 EKF
+                                                        S8 Banister ODE ──► S9 EKF (historical)
                                                                                │
                                                                                ▼
-S10 FastAPI ◄─────────────────────────────────────────────────────────────────┘
+S10 FastAPI ◄──────────────────────────────────────────────────────────────────┘
      │
      ▼
-S11 Dash skeleton ──► S12 Panel estado ──► S13 Simulador + desacoplamiento
-                                                       │
-                                                       ▼
-                                         S14 Integración real ──► S15 Docker/CI ──► S16 Portfolio
+S11 Dash skeleton ──► S12 Status panel ──► S13 Simulator + decoupling
+                                                    │
+                                                    ▼
+                                   S14 Real-data integration + NLS ──► S15 Docker/CI ──► S16 Public docs
 ```
 
----
-
-## 6. Plan semanal (Sprints)
-
-### Fase 0 — Fundamentos, Conexión Polar e Ingesta (Mes 1)
-
-#### Semana 1 — Entorno, repo y scaffolding
-**Objetivo:** dejar el proyecto reproducible desde el minuto cero, con tooling completo.
-
-- [x] Instalar `uv` y fijar Python 3.12 con `.python-version`.
-- [x] Inicializar proyecto con `uv init` y layout `src/athlete_stress_sim/` (paquete único).
-- [x] Configurar `pyproject.toml`: dependencias (`scipy`, `statsmodels`, `filterpy`, `httpx2`, `fitparse`, `duckdb`, `fastapi`, `uvicorn`, `dash`, `dash-mantine-components`, `pydantic`), `[project.scripts]`, `[tool.uv]`, `[tool.ruff]`, `[tool.mypy]`, `[tool.pytest.ini_options]`; generar `uv.lock`.
-- [x] Crear `src/athlete_stress_sim/backend/config.py` con constantes fisiológicas y placeholders de credenciales (`HR_max`, `HR_reposo`, `tau_1`, `tau_2`, `k_1`, `k_2`, `b`).
-- [x] Crear `.env.example` (client_id, client_secret, access_token, etc.).
-- [x] Crear `Makefile` con targets: `install`, `lint`, `format`, `typecheck`, `test`, `run-backend`, `run-frontend`, `docker-up`, `docker-down`.
-- [x] Configurar `.pre-commit-config.yaml` (ruff, ruff-format, mypy, end-of-file-fixer, trailing-whitespace, check-yaml, check-toml, detect-private-key).
-- [x] Configurar `.github/workflows/ci.yml` que invoque `make lint`, `make typecheck` y `make test` (no comandos sueltos).
-- [x] Configurar `docker/Dockerfile.*` y `docker-compose.yml` instalando dependencias vía `uv sync`.
-- [x] Hito: `make install && make lint && make test` y `docker compose up` funcionan sin errores.
-
-#### Semana 2 — Autenticación OAuth2 Polar
-**Objetivo:** vincular la cuenta Polar (`RF-01.1`).
-
-- [x] Implementar flujo Authorization Code + `state` con `httpx2` (cliente confidencial, sin PKCE).
-- [x] Endpoints `/auth/login` y `/auth/callback` en FastAPI.
-- [x] Registrar usuario Polar y persistir tokens (access + refresh) en DuckDB o config cifrada.
-- [x] Gestión de refresco de token automático (expiración).
-- [x] Tests unitarios del flujo con servidor OAuth mockeado.
-- [x] Hito: se obtiene y renueva un `access_token` válido de forma programática.
-
-#### Semana 3 — Cliente AccessLink y sincronización catch-up
-**Objetivo:** descargar sesiones automáticamente (`RF-01.2`).
-
-- [x] Cliente `src/athlete_stress_sim/core/etl/polar_client.py`: listar `exercises`, obtener resúmenes y descargar `.FIT`/`.TCX`.
-- [x] Sincronización *catch-up* idempotente (arranque + `POST /sync`); webhooks/cron diferidos (uso local, sin HTTPS pública).
-- [x] Registro de ingesta en DuckDB (`ingest_log`) como cola para S4.
-- [x] Manejo de errores, reintentos con backoff y `429` (rate limiting).
-- [x] Hito: al sincronizar, una sesión nueva se descarga automáticamente y queda registrada.
-
-#### Semana 4 — Parser FIT/TCX y persistencia DuckDB
-**Objetivo:** series temporales segundo a segundo en DuckDB (`RF-01.3`, `RNF-01`).
-
-- [x] Parser `.FIT` con `fitparse` extrayendo `HR_t`, `pace_t` (velocidad), cadencia y altitud (TCX diferido; el Polar emite FIT).
-- [x] Modelo de datos OLAP en DuckDB: tablas `exercises`, `samples`, `athlete`.
-- [x] ETL de normalización y validación de series (outliers, gaps).
-- [x] Tests de parser con archivos `.FIT` sintéticos generados en test (sin datos biométricos reales).
-- [x] Hito: una sesión de carrera queda persistida y consultable por SQL.
+`S9` is kept as a historical milestone: the EKF was replaced in `S14` by the
+production NLS calibration.
 
 ---
 
-### Fase 1 — Motor Fisiológico (Mes 2)
+## 6. Weekly plan (sprints)
 
-#### Semana 5 — TRIMP de carrera (Banister)
-**Objetivo:** cuantificar carga de carrera (`RF-02.1`).
+### Phase 0 — Foundations, Polar connection and ingestion (Month 1)
 
-- [x] Implementar `src/athlete_stress_sim/core/metrics/trimp.py` con `TRIMP = D · HR_r · a · e^{b·HR_r}` (hombre: a=0.64, b=1.92; mujer: a=0.86, b=1.67), integrado segundo a segundo.
-- [x] Añadir a `config.py` la variable `sex` (`male`/`female`) para seleccionar los parámetros (a, b).
-- [x] Cálculo de `HR_r` a partir de HR (media y/o por segundo), reposo y máxima.
-- [x] Tests contra valores de referencia calculados a mano (ambos sexos).
+#### Week 1 — Environment, repository and scaffolding
 
-#### Semana 6 — Carga de gimnasio (sRPE de Foster)
-**Objetivo:** cuantificar carga de fuerza (`RF-02.2`, `RF-01.4`).
+**Objective:** make the project reproducible from the first minute with a
+complete toolchain.
 
-- [x] Modelo `TRIMP_gym = RPE · D_min` (session-RPE de Foster, Borg CR-10 0–10) en `core/metrics/rpe.py`.
-- [x] Registro de sesiones de fuerza y del RPE en la tabla `session_rpe` de DuckDB.
-- [x] API para introducir RPE post-entreno (`POST /exercises/{id}/rpe`); componente de dashboard diferido a S11–S13.
-- [x] Tests del cálculo sRPE y de los endpoints.
+- [x] Install `uv` and pin Python 3.12 with `.python-version`.
+- [x] Initialize the project with `uv init` and the
+  `src/athlete_stress_sim/` layout (single package).
+- [x] Configure `pyproject.toml`: dependencies (`numpy`, `scipy`, `fitparse`,
+  `duckdb`, `fastapi`, `uvicorn`, `dash`, `dash-mantine-components`, `plotly`,
+  `pydantic`, `pydantic-settings`, `python-dotenv`, `httpx2`),
+  `[project.scripts]`, `[tool.uv]`, `[tool.ruff]`, `[tool.mypy]`,
+  `[tool.pytest.ini_options]`; generate `uv.lock`.
+- [x] Create `src/athlete_stress_sim/backend/config.py` with physiological
+  constants and credential placeholders (`hr_max`, `hr_rest`, `tau_1`, `tau_2`,
+  `k_1`, `k_2`, `p0`, `sex`).
+- [x] Create `.env.example` (client id, client secret, tokens, physiological
+  priors and storage paths).
+- [x] Create the `Makefile` with `install`, `lint`, `format`, `typecheck`,
+  `test`, `test-cov`, `run-backend`, `run-frontend`, `db`, `docker-up`,
+  `docker-logs`, `docker-down` and `clean`.
+- [x] Configure `.pre-commit-config.yaml` (ruff, ruff-format, mypy,
+  end-of-file-fixer, trailing-whitespace, check-yaml, check-toml,
+  detect-private-key).
+- [x] Configure `.github/workflows/ci.yml` to run `make lint`,
+  `make typecheck` and `make test-cov` (no ad-hoc commands).
+- [x] Configure `docker/Dockerfile.*` and `docker/docker-compose.yml`, installing
+  dependencies through `uv sync`.
+- [x] Milestone: `make install && make lint && make test-cov` and
+  `docker compose up` work without errors.
 
-#### Semana 7 — ACWR (EWMA)
-**Objetivo:** evaluar riesgo de lesión (`RF-04.1`, `RF-04.2`).
+#### Week 2 — Polar OAuth2 authentication
 
-- [x] Cálculo de Carga Aguda (EWMA 7 días) y Crónica (EWMA 28 días), `λ = 2/(N+1)`.
-- [x] Ratio `ACWR` y matriz de alerta (Sweet Spot / Advertencia / Peligro).
-- [x] Ensamblado de carga diaria (TRIMP carrera + sRPE gimnasio) en `core/metrics/load.py`.
-- [x] Tests de la serie EWMA, del agregado diario y de los umbrales.
+**Objective:** link the Polar account (`RF-01.1`).
 
-#### Semana 8 — Modelo Banister (EDO)
-**Objetivo:** modelar Fitness-Fatiga (`RF-03.1`).
+- [x] Implement the Authorization Code flow with `state` using `httpx2`
+  (confidential client, no PKCE).
+- [x] Add `/auth/login` and `/auth/callback` endpoints in FastAPI.
+- [x] Register the Polar user and persist access and refresh tokens in DuckDB.
+- [x] Manage automatic token refresh before expiration.
+- [x] Add unit tests for the flow with a mocked OAuth server.
+- [x] Milestone: a valid `access_token` is obtained and renewed programmatically.
 
-- [x] Recurrencia exacta (`impulse_response`) + resolución numérica con `scipy.integrate.solve_ivp` (`odeint` deprecado).
-- [x] Calcular `P(t) = P0 + k1·g(t) − k2·h(t)` y `Freshness`.
-- [x] Tests de estabilidad y de respuesta a un impulso de carga.
-- [x] Bench para verificar `RNF-02` (< 0.5 s).
+#### Week 3 — AccessLink client and catch-up sync
 
-#### Semana 9 — Filtro de Kalman Extendido (EKF)
-**Objetivo:** ajustar parámetros individuales (`RF-03.2`). *Sustituido en S14 por NLS con `tau` fijo + ridge y gate CV; se conserva como referencia histórica.*
+**Objective:** download sessions automatically (`RF-01.2`).
 
-- [x] Implementar EKF con `filterpy` para estimar `k_1, k_2, tau_1, tau_2` (estado aumentado).
-- [x] Integrar observaciones de rendimiento (el EKF las consume; la extracción real de ritmo a HR constante se difiere a S14).
-- [x] Tests con datos sintéticos (convergencia de parámetros).
+- [x] Implement `core/etl/polar_client.py`: list `exercises`, fetch summaries and
+  download FIT files. TCX is not required because the Polar Ignite emits FIT.
+- [x] Implement an idempotent **catch-up sync** (startup + `POST /sync`);
+  webhooks/cron are deferred because the local deployment has no public HTTPS
+  endpoint.
+- [x] Record ingestion in DuckDB (`ingest_log`) as a queue for S4.
+- [x] Handle errors, retries with backoff and `429` rate limiting.
+- [x] Milestone: a new session is downloaded automatically and registered during
+  a sync.
 
----
+#### Week 4 — FIT parser and DuckDB persistence
 
-### Fase 2 — API y Dashboard (Mes 3)
+**Objective:** persist second-by-second time series in DuckDB (`RF-01.3`,
+`RNF-01`).
 
-#### Semana 10 — Backend FastAPI
-**Objetivo:** exponer métricas y simulaciones (`RF-05`).
-
-- [x] Endpoints REST: `/metrics/trimp/{exercise_id}`, `/metrics/acwr`, `/metrics/banister`, `/simulate`.
-- [x] Modelos Pydantic (`src/athlete_stress_sim/backend/schemas/metrics.py`) de request/response.
-- [x] Integración con DuckDB y el motor fisiológico.
-- [x] Tests de integración de la API (`tests/test_metrics_api.py`).
-
-#### Semana 11 — Dashboard (skeleton + panel de estado)
-**Objetivo:** estructura visual y panel diario (`RF-05.1`).
-
-- [x] App `src/athlete_stress_sim/frontend/app.py` con Plotly Dash + Mantine (tema oscuro, `RNF-04`).
-- [x] Semáforo de *Readiness Score* y métrica de *Freshness* (`frontend/readiness.py`, `frontend/components/status.py`).
-- [x] Layout responsive y componentes base (cliente HTTP `frontend/api.py`, carga inicial + botón Refresh).
-
-#### Semana 12 — Dashboard (Fitness-Fatiga + ACWR)
-**Objetivo:** visualizar la dinámica del modelo.
-
-- [x] Gráfico de Fitness / Fatiga / Forma (TSB) a lo largo del tiempo (`frontend/components/fitness_chart.py`).
-- [x] Tacómetro de riesgo ACWR con matriz de colores (`frontend/components/acwr_gauge.py`).
-- [x] Panel de estado fisiológico completo y conectado a la API (`frontend/app.py`).
-
-#### Semana 13 — Simulador de tapering y desacoplamiento
-**Objetivo:** planificación predictiva (`RF-05.2`, `RF-05.3`).
-
-- [x] Entrada de entrenamientos futuros proyectados (ej. "12 km a 5:00/km") vía formulario (`frontend/components/simulator.py`) + `POST /simulate/taper` (sRPE `RPE × duración`).
-- [x] Gráfico predictivo de fatiga/forma hasta el día de la Media Maratón (histórico sólido + pronóstico discontinuo).
-- [x] Métrica de desacoplamiento aeróbico `EF = velocidad / HR` por kilómetros (`core/metrics/decoupling.py` + `GET /metrics/decoupling/{id}`), visible en el dashboard (`frontend/components/decoupling.py`).
-- [x] Tests del simulador y de la métrica EF.
-
----
-
-### Fase 3 — Uso real, validación y portfolio (Mes 4)
-
-#### Semana 14 — Integración en rutina real y validación
-**Objetivo:** poner el sistema a trabajar con datos reales.
-
-- [x] Sincronizar al menos 2 semanas de datos reales (3 gym + 3 carrera). Verificado: 14 carrera + 11 gym (2026-10-03 → 2026-11-03), 11/11 gym con RPE.
-- [x] Soporte de elíptica como actividad de FC: carga por TRIMP en ACWR/Banister, excluida de baseline, taper, desacoplamiento y predicción de carrera; filtro `kind=elliptical` en `/exercises`.
-- [x] Validar parámetros EKF contra observaciones reales. Tras el estudio de calibración, producción usa NLS con `tau` fijo + ridge y gate por validación cruzada (`GET /metrics/calibration`, alias `/metrics/ekf`); con 13 observaciones reales no supera el gate y cae a priors.
-- [x] Ajustar tapering para las semanas previas a la Media Maratón. Implementado `POST /simulate/taper/plan` + panel `Race taper` (factores 0,75/0,55/0,35, baseline de 4 semanas); validado con datos reales, el freshness máximo cae el 2026-12-13.
-- [x] Predicción de tiempo de carrera (`RF-05.4`). Implementados `GET /metrics/best-efforts` y `POST /metrics/race-prediction` + panel `Race predictor` con Riegel, velocidad crítica, %HRR, EF, ajuste por fitness, horquilla y confianza.
-- [ ] Corrección de bugs encontrados en uso real.
-
-#### Semana 15 — Optimización, Docker y CI/CD
-**Objetivo:** dejar el sistema robusto y reproducible (`RNF-03`).
-
-- [x] Optimizar consultas DuckDB y tiempos de simulación. Lecturas por lote (`list_exercises_with_rpe` + `query_all_samples`), filas ligeras `SampleRow`, índice sobre `samples(exercise_id)` y caché por revisión de BD: dashboard de 5,5 s a ~0,32 s en caliente, endpoints de métricas < 200 ms.
-- [x] Empaquetado final Docker y `docker compose up` en frío. Imágenes solo con dependencias de runtime, sin datos ni secretos; `build --no-cache`, arranque con BD real y con BD vacía verificados.
-- [x] Pipeline CI/CD verde (lint + test) en `.github/workflows/ci.yml`. CI ejecuta `lint → typecheck → test-cov` con umbral del 80 % en `core`; validado localmente, pendiente confirmar el run de GitHub tras el push.
-
-#### Semana 16 — Documentación pública y portfolio
-**Objetivo:** cerrar el proyecto presentable.
-
-- [ ] `README.md` público en inglés con:
-  - [ ] Explicación matemática (ecuaciones LaTeX).
-  - [ ] Diagrama de arquitectura.
-  - [ ] Capturas reales del dashboard.
-- [ ] Revisión de credenciales expuestas y limpieza de secretos.
-- [ ] Tag de release `v1.0.0`.
+- [x] Parse FIT files with `fitparse`, extracting heart rate, speed/pace,
+  cadence, altitude and cumulative distance.
+- [x] Build the DuckDB OLAP model: `athlete`, `exercises`, `samples` and
+  `session_rpe` tables.
+- [x] Normalize and validate series (outliers, gaps, invalid samples).
+- [x] Test the parser with synthetic FIT files generated in the tests (no real
+  biometric data).
+- [x] Milestone: a running session is persisted and queryable through SQL.
 
 ---
 
-## 7. Criterios de aceptación por fase
+### Phase 1 — Physiological engine (Month 2)
 
-### Fase 0 — DoD
-- [x] Se puede autenticar contra Polar AccessLink y persistir tokens.
-- [x] Una sesión de carrera queda persistida en DuckDB con series segundo a segundo.
-- [x] Entorno Docker reproducible con `docker compose up`.
-- [x] Tests de `src/athlete_stress_sim/core/etl` en verde.
+#### Week 5 — Running TRIMP (Banister)
 
-### Fase 1 — DoD
-- [x] TRIMP (carrera, elíptica y gym), ACWR, EDO Banister y calibración implementados y testeados (EKF sustituido por NLS en S14).
-- [x] Cobertura de `src/athlete_stress_sim/core` ≥ 80 %.
-- [x] Simulación EDO < 0.5 s.
+**Objective:** quantify running load (`RF-02.1`).
 
-### Fase 2 — DoD
-- [x] API FastAPI sirve métricas y simulaciones.
-- [x] Dashboard (dark mode) muestra estado fisiológico, Fitness/Fatiga/Forma, ACWR, desacoplamiento aeróbico y simulador de tapering.
-- [x] End-to-end: dashboard ↔ API ↔ DuckDB funcional.
+- [x] Implement `core/metrics/trimp.py` with
+  `TRIMP = D · HR_r · a · e^(b·HR_r)` (male: `a=0.64`, `b=1.92`; female:
+  `a=0.86`, `b=1.67`), integrated second by second.
+- [x] Add `sex` (`male`/`female`) to `config.py` to select the coefficients.
+- [x] Compute `HR_r` from heart rate, resting heart rate and maximum heart rate.
+- [x] Test against hand-calculated reference values for both sexes.
 
-### Fase 3 — DoD
-- [x] Sistema validado con ≥ 2 semanas de datos reales.
-- [x] CI/CD verde y despliegue Docker reproducible. Docker verificado en frío; CI validado en local con `make test-cov` (pendiente el run de GitHub tras el push).
-- [ ] `README.md` público completo (inglés, LaTeX, diagramas, capturas).
+#### Week 6 — Gym load (Foster session-RPE)
+
+**Objective:** quantify strength load (`RF-02.2`, `RF-01.4`).
+
+- [x] Implement `TRIMP_gym = RPE · D_min` (Foster session-RPE, Borg CR-10 0–10)
+  in `core/metrics/rpe.py`.
+- [x] Store strength sessions and their RPE in the `session_rpe` table.
+- [x] Add an API endpoint for post-workout RPE (`POST /exercises/{id}/rpe`); the
+  dashboard component is delivered in S11–S13.
+- [x] Test the sRPE calculation and the endpoints.
+
+#### Week 7 — ACWR (EWMA)
+
+**Objective:** estimate injury risk (`RF-04.1`, `RF-04.2`).
+
+- [x] Compute acute load (7-day EWMA) and chronic load (28-day EWMA),
+  `λ = 2/(N+1)`.
+- [x] Compute the `ACWR` ratio and risk matrix (sweet spot / warning / danger).
+- [x] Assemble daily load (running TRIMP + gym sRPE) in `core/metrics/load.py`.
+- [x] Test the EWMA series, daily aggregation and risk thresholds.
+
+#### Week 8 — Banister model (ODE)
+
+**Objective:** model fitness-fatigue (`RF-03.1`).
+
+- [x] Implement the exact recurrence (`impulse_response`) and a numerical
+  cross-check with `scipy.integrate.solve_ivp` (`odeint` is deprecated).
+- [x] Compute `P(t) = P0 + k1·g(t) − k2·h(t)` and freshness.
+- [x] Test stability and the response to a load impulse.
+- [x] Benchmark `RNF-02` (< 0.5 s).
+
+#### Week 9 — Extended Kalman Filter (EKF)
+
+**Objective:** estimate individual parameters (`RF-03.2`). *Replaced in S14 by
+NLS with fixed `tau` + ridge and a CV gate; kept as a historical reference.*
+
+- [x] Implement an EKF with `filterpy` to estimate `k_1`, `k_2`, `tau_1` and
+  `tau_2` (augmented state).
+- [x] Integrate performance observations (the EKF consumes them; real extraction
+  of pace at constant heart rate was deferred to S14).
+- [x] Test with synthetic data (parameter convergence).
+
+> **Historical note.** The EKF was a valid prototype but the gains and time
+> constants were not identifiable enough from a single noisy performance series.
+> The production path uses NLS with fixed priors and a cross-validation gate.
 
 ---
 
-## 8. Riesgos y mitigaciones
+### Phase 2 — API and dashboard (Month 3)
 
-| Riesgo | Impacto | Probabilidad | Mitigación |
-|--------|---------|--------------|------------|
-| Dependencia de disponibilidad/rate-limit de la API Polar | Alto | Media | Sincronización *catch-up* idempotente (arranque + botón) con reintentos/backoff y `Retry-After`; cacheo local (S3). |
-| `AccessLink` v4 (Dynamic API, JSON) podría simplificar la ingesta | Medio | Baja | Evaluada en S3; se mantiene v3 (FIT/TCX) y la migración se difiere a F3 si aporta valor. |
-| Datos insuficientes para calibrar el modelo (pocas semanas) | Alto | Media | Usar priors bibliográficos; arrancar con valores de referencia (S1). |
-| Complejidad matemática (EDO + calibración) consume más tiempo del previsto | Alto | Media | Separar métricas (F1) de modelos (F1 tardía); priorizar TRIMP/ACWR como MVP. |
-| Curva de aprendizaje de Plotly Dash + Mantine | Medio | Media | Esqueleto temprano (S11); componentes reutilizables. |
-| Fixtures `.FIT` de ejemplo limitadas | Medio | Baja | Generar datos sintéticos además de capturas reales (S4). |
-| Exposición accidental de credenciales | Alto | Baja | `.env` en `.gitignore`; revisión final (S16). |
+#### Week 10 — FastAPI backend
+
+**Objective:** expose metrics and simulations (`RF-05`).
+
+- [x] Add REST endpoints: `/metrics/trimp/{exercise_id}`, `/metrics/acwr`,
+  `/metrics/banister` and `/simulate`.
+- [x] Add Pydantic request/response models
+  (`backend/schemas/metrics.py`).
+- [x] Integrate DuckDB and the physiological engine.
+- [x] Add API integration tests (`tests/test_metrics_api.py`).
+
+#### Week 11 — Dashboard skeleton and status panel
+
+**Objective:** establish the visual structure and daily status panel
+(`RF-05.1`).
+
+- [x] Build `frontend/app.py` with Plotly Dash + Mantine (dark theme,
+  `RNF-04`) and the Today/Trends/Plan tabs.
+- [x] Add the readiness traffic light and freshness metric
+  (`frontend/readiness.py`, `frontend/components/status.py`).
+- [x] Build a responsive layout and base components (HTTP client
+  `frontend/api.py`, initial load and Refresh button).
+- [x] Add the **RPE pending** modal for strength sessions without RPE.
+
+#### Week 12 — Dashboard: fitness-fatigue + ACWR
+
+**Objective:** visualize the model dynamics.
+
+- [x] Add the fitness / fatigue / freshness (TSB) chart over time
+  (`frontend/components/fitness_chart.py`).
+- [x] Add the ACWR risk gauge with the color matrix
+  (`frontend/components/acwr_gauge.py`).
+- [x] Connect the complete physiological status panel to the API
+  (`frontend/app.py`).
+
+#### Week 13 — Tapering simulator and decoupling
+
+**Objective:** predictive planning (`RF-05.2`, `RF-05.3`).
+
+- [x] Accept projected future sessions (e.g. "12 km at 5:00/km") through a form
+  (`frontend/components/simulator.py`) and `POST /simulate/taper` (sRPE
+  `RPE × duration`).
+- [x] Add a predictive fatigue/form chart up to the half-marathon date (solid
+  history + dashed forecast).
+- [x] Add aerobic decoupling `EF = speed / HR` per kilometer
+  (`core/metrics/decoupling.py` + `GET /metrics/decoupling/{id}`), visible in
+  the dashboard (`frontend/components/decoupling.py`).
+- [x] Test the simulator and the EF metric.
 
 ---
 
-## 9. Priorización (MoSCoW)
+### Phase 3 — Real use, validation and portfolio (Month 4)
 
-**Must have (núcleo del MVP):**
-- `RF-01` Ingesta Polar + DuckDB
-- `RF-02` TRIMP (carrera + gym)
+#### Week 14 — Real-routine integration and validation
+
+**Objective:** put the system to work with real data.
+
+- [x] Sync at least 2 weeks of real data (3 gym + 3 running days). Verified:
+  14 runs + 11 gym sessions (2026-10-03 → 2026-11-03), 11/11 gym sessions with
+  RPE.
+- [x] Support elliptical as a heart-rate activity: TRIMP load in ACWR/Banister,
+  excluded from baseline, taper, decoupling and race prediction; `kind=elliptical`
+  filter in `/exercises`.
+- [x] Validate calibration against real observations. After the identifiability
+  study, production uses NLS with fixed `tau` + ridge and a cross-validation gate
+  (`GET /metrics/calibration`, deprecated alias `/metrics/ekf`); with 13 real
+  observations the gate is not passed and the system falls back to priors.
+- [x] Tune the taper for the weeks before the half marathon. Implemented
+  `POST /simulate/taper/plan` + the `Race taper` panel (factors 0.75/0.55/0.35,
+  4-week baseline); validated with real data, maximum freshness falls on
+  2026-12-13.
+- [x] Race-time prediction (`RF-05.4`). Implemented `GET /metrics/best-efforts`
+  and `POST /metrics/race-prediction` + the `Race predictor` panel with Riegel,
+  critical speed, `%HRR`, EF, fitness adjustment, range and confidence.
+- [ ] Fix bugs found during real use. No blocking defects were found; minor
+  frontend fixes landed and remaining polish is tracked as maintenance.
+
+#### Week 15 — Optimization, Docker and CI/CD
+
+**Objective:** make the system robust and reproducible (`RNF-03`).
+
+- [x] Optimize DuckDB queries and simulation times. Batch reads
+  (`list_exercises_with_rpe` + `query_all_samples`), lightweight `SampleRow`
+  rows, an index on `samples(exercise_id)` and a database-revision cache:
+  dashboard from 5.5 s to ~0.32 s warm, metric endpoints < 200 ms.
+- [x] Finalize Docker packaging and cold-start `docker compose up`. Runtime-only
+  images with no data or secrets; `build --no-cache`, start with a real database
+  and with an empty database verified.
+- [x] Reach a green CI/CD pipeline (lint + test) in `.github/workflows/ci.yml`.
+  CI runs `lint → typecheck → test-cov` with the 80 % gate on `core`; validated
+  locally, GitHub run pending confirmation after the push.
+
+#### Week 16 — Public documentation and portfolio
+
+**Objective:** close the project in a presentable state.
+
+- [~] Public `README.md` in English with:
+  - [ ] Mathematical explanation (LaTeX equations).
+  - [ ] Architecture diagram.
+  - [ ] Real dashboard captures.
+- [x] Translate the PRD to English and update it to the as-built state.
+- [x] Translate the roadmap to English and update it to the as-built state.
+- [~] Translate and update the user guide to English.
+- [ ] Write the technical deep dives: `architecture.md`, `mathematical-model.md`
+  and `validation.md`.
+- [ ] Review exposed credentials and clean up secrets.
+- [ ] Add `LICENSE` (MIT) and `CHANGELOG.md`.
+- [ ] Tag the `v1.0.0` release.
+
+---
+
+## 7. Acceptance criteria by phase (Definition of Done)
+
+### Phase 0 — DoD
+
+- [x] Authenticate against Polar AccessLink and persist tokens.
+- [x] Persist a running session in DuckDB with second-by-second series.
+- [x] Reproducible Docker environment with `docker compose up`.
+- [x] Tests for `src/athlete_stress_sim/core/etl` are green.
+
+### Phase 1 — DoD
+
+- [x] TRIMP (running, elliptical and gym), ACWR, Banister ODE and calibration
+  implemented and tested (EKF replaced by NLS in S14).
+- [x] Coverage of `src/athlete_stress_sim/core` ≥ 80 %.
+- [x] ODE simulation < 0.5 s.
+
+### Phase 2 — DoD
+
+- [x] FastAPI serves metrics and simulations.
+- [x] Dashboard (dark mode) shows physiological status, fitness/fatigue/freshness,
+  ACWR, aerobic decoupling and the tapering simulator.
+- [x] End-to-end: dashboard ↔ API ↔ DuckDB works.
+
+### Phase 3 — DoD
+
+- [x] System validated with ≥ 2 weeks of real data.
+- [x] Green CI/CD and reproducible Docker deployment. Docker verified cold; CI
+  validated locally with `make test-cov` (GitHub run pending after the push).
+- [~] Complete public documentation (English, LaTeX, diagrams, captures).
+
+---
+
+## 8. Risks and mitigations
+
+| Risk | Impact | Probability | Mitigation |
+| --- | --- | --- | --- |
+| Polar API availability / rate limits | High | Medium | Idempotent catch-up sync (startup + button) with retries/backoff and `Retry-After`; local caching (S3). |
+| AccessLink v4 (Dynamic API, JSON) could simplify ingestion | Medium | Low | Evaluated in S3; v3 (FIT) is retained and migration is deferred unless it adds value. |
+| Insufficient data to calibrate the model (few weeks) | High | Medium | Use bibliographic priors; start with reference values (S1). |
+| Mathematical complexity (ODE + calibration) takes longer than expected | High | Medium | Separate metrics (F1) from models (late F1); prioritize TRIMP/ACWR as the MVP. |
+| Plotly Dash + Mantine learning curve | Medium | Medium | Early skeleton (S11); reusable components. |
+| Limited example `.FIT` fixtures | Medium | Low | Generate synthetic data in addition to real captures (S4). |
+| Accidental credential exposure | High | Low | `.env` in `.gitignore`; final review (S16). |
+| Calibration identifiability | High | Medium | Fix `tau`, estimate only the gains with bounded ridge and a CV gate; fall back to priors when the gate fails. |
+| Privacy leak in published screenshots | High | Low | Review and sanitize captures; never commit raw FIT files or the DuckDB database. |
+| Documentation drift | Medium | Medium | Keep the PRD/roadmap as the source of truth; verify commands, formulas and links before release. |
+
+---
+
+## 9. Prioritization (MoSCoW)
+
+**Must have (MVP core):**
+
+- `RF-01` Polar ingestion + DuckDB
+- `RF-02` TRIMP (running + gym)
 - `RF-04` ACWR
-- `RF-03.1` EDO Banister
-- `RF-05.1` Panel de estado
+- `RF-03.1` Banister ODE
+- `RF-05.1` Status panel
 - `RNF-01`, `RNF-02`, `RNF-03`
 
-**Should have (alto valor, esfuerzo medio):**
-- `RF-05.2` Simulador de tapering
-- `RF-03.2` Calibración (NLS)
-- `RF-05.3` Desacoplamiento aeróbico
+**Should have (high value, medium effort):**
 
-**Could have (si sobra tiempo):**
-- Exportación de reportes (PDF/CSV).
-- Comparativas entre bloques de entrenamiento.
-- Alertas push/email de riesgo ACWR.
+- `RF-05.2` Tapering simulator and race taper
+- `RF-03.2` Calibration (NLS)
+- `RF-05.3` Aerobic decoupling
+- `RF-05.4` Race-time prediction
+- `RF-01.5` / `RF-02.3` Elliptical support
 
-**Won't have (fuera de alcance del cuatrimestre):**
-- Soporte multi-usuario real (solo usuario cero).
-- Integración con otros dispositivos (Garmin, Whoop).
+**Could have (if time allows):**
+
+- Report export (PDF/CSV).
+- Comparisons between training blocks.
+- Push/email ACWR risk alerts.
+
+**Won't have (outside the semester scope):**
+
+- Real multi-user support (user zero only).
+- Integration with other devices (Garmin, Whoop).
 
 ---
 
-## 10. Cómo se actualiza este roadmap
+## 10. How this roadmap is updated
 
-1. **Al inicio de cada sprint:** se revisa el sprint en curso y se mueve a `[~]` la casilla maestra correspondiente.
-2. **Durante el sprint:** se marcan las tareas individuales a medida que se completan.
-3. **Al final del sprint:** se verifica el DoD de la fase y se actualiza su casilla en `## 7`.
-4. **Cambios de alcance:** cualquier desviación del PRD se refleja aquí con una nota y, si es estructural, se propaga también al PRD.
-5. El historial de decisiones se registra en los mensajes de `git commit` y en issues/PRs del repositorio.
+1. **At the start of each sprint:** review the current sprint and move its master
+   checkbox to `[~]`.
+2. **During the sprint:** mark individual tasks as they are completed.
+3. **At the end of the sprint:** verify the phase DoD and update its checkbox in
+   `## 7`.
+4. **Scope changes:** any deviation from the PRD is recorded here with a note
+   and, if structural, propagated to the PRD.
+5. **Decision history:** recorded in `git commit` messages and repository
+   issues/PRs.
 
-> **Regla de oro:** si una tarea no aparece en este documento, o bien no forma parte del alcance, o bien debe añadirse explícitamente antes de implementarse.
+> **Golden rule:** if a task does not appear in this document, it is either out
+> of scope or must be added explicitly before implementation.
