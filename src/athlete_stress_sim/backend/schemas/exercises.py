@@ -13,6 +13,21 @@ class RpeInput(BaseModel):
     rpe: float = Field(ge=0, le=10, description="Borg CR-10 session RPE (0-10).")
 
 
+class ExerciseUpdate(BaseModel):
+    """Editable exercise metadata for manual corrections."""
+
+    sport: str | None = None
+    sub_sport: str | None = None
+    start_time: datetime | None = None
+    duration_s: float | None = Field(default=None, ge=0)
+    distance_m: float | None = Field(default=None, ge=0)
+    calories: float | None = Field(default=None, ge=0)
+    avg_hr: int | None = Field(default=None, ge=0)
+    max_hr: int | None = Field(default=None, ge=0)
+    total_ascent_m: float | None = Field(default=None, ge=0)
+    total_descent_m: float | None = Field(default=None, ge=0)
+
+
 class ExerciseOut(BaseModel):
     """Exercise summary with its RPE and computed strength load, if any."""
 
@@ -23,5 +38,6 @@ class ExerciseOut(BaseModel):
     duration_s: float | None = None
     distance_m: float | None = None
     avg_hr: int | None = None
+    max_hr: int | None = None
     rpe: float | None = None
     load: float | None = None

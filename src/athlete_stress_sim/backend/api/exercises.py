@@ -7,7 +7,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, HTTPException
 
 from athlete_stress_sim.backend.api.ingest import get_session_store
-from athlete_stress_sim.backend.schemas.exercises import ExerciseOut, RpeInput
+from athlete_stress_sim.backend.schemas.exercises import ExerciseOut, ExerciseUpdate, RpeInput
 from athlete_stress_sim.core.etl.sports import SportKind, classify_sport
 from athlete_stress_sim.core.etl.types import Exercise
 from athlete_stress_sim.core.metrics.rpe import session_rpe_load
@@ -30,6 +30,7 @@ def _to_out(exercise: Exercise, rpe: float | None) -> ExerciseOut:
         duration_s=exercise.duration_s,
         distance_m=exercise.distance_m,
         avg_hr=exercise.avg_hr,
+        max_hr=exercise.max_hr,
         rpe=rpe,
         load=load,
     )
@@ -74,3 +75,20 @@ def set_rpe(exercise_id: str, payload: RpeInput, store: SessionStoreDep) -> Exer
         raise HTTPException(status_code=404, detail=f"Unknown exercise {exercise_id!r}.")
     store.set_rpe(exercise_id, payload.rpe)
     return _to_out(exercise, payload.rpe)
+
+
+@router.patch("/{exercise_id}")
+def update_exercise(
+    exercise_id: str,
+    payload: ExerciseUpdate,
+    store: SessionStoreDep,
+) -> ExerciseOut:
+    """Update editable metadata of one exercise and return the new state."""
+    exercise = store.get_exercise(exercise_id)
+    if exercise is None:
+        raise HTTPException(status_code=404, detail=f"Unknown exercise {exercise_id!r}.")
+    store.update_exercise(exercise_id, payload.model_dump(exclude_unset=True))
+    updated = store.get_exercise(exercise_id)
+    if updated is None:
+        raise HTTPException(status_code=404, detail=f"Unknown exercise {exercise_id!r}.")
+    return _to_out(updated, store.get_rpe(exercise_id))

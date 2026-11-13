@@ -16,7 +16,11 @@ from athlete_stress_sim.frontend.components.rpe import (
     rpe_pending_style,
     rpe_session_options,
 )
-from athlete_stress_sim.frontend.components.sessions import recent_sessions_panel
+from athlete_stress_sim.frontend.components.sessions import (
+    recent_sessions_panel,
+    session_edit_modal,
+    session_editor_card,
+)
 from athlete_stress_sim.frontend.components.simulator import race_taper_panel, simulator_panel
 
 _START = datetime(2026, 10, 4, 18, 0, 0)
@@ -110,9 +114,9 @@ def test_race_taper_form_starts_empty() -> None:
         "race-runs",
         "race-pace",
         "race-rpe",
+        "race-weeks",
     ):
         assert getattr(components[component_id], "value", None) is None
-    assert components["race-weeks"].value == 3
 
 
 def test_rpe_pending_message_describes_pending_count() -> None:
@@ -137,3 +141,19 @@ def test_recent_sessions_panel_without_pending_disables_action() -> None:
     components = _by_id(recent_sessions_panel([_exercise("gym1", rpe=6.0)]))
 
     assert components["sessions-rpe-open"].disabled is True
+
+
+def test_session_editor_card_and_modal_have_ids() -> None:
+    card_ids = set(_by_id(session_editor_card()))
+    modal_ids = set(_by_id(session_edit_modal()))
+
+    assert {"edit-session-select", "edit-session-open", "edit-session-status"} <= card_ids
+    assert {
+        "edit-start-time",
+        "edit-distance",
+        "edit-duration",
+        "edit-avg-hr",
+        "edit-max-hr",
+        "edit-session-save",
+        "edit-session-cancel",
+    } <= modal_ids

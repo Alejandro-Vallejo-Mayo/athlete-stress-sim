@@ -104,3 +104,24 @@ def test_set_rpe_out_of_range_is_rejected(client: TestClient) -> None:
 
 def test_set_rpe_unknown_exercise_is_404(client: TestClient) -> None:
     assert client.post("/exercises/missing/rpe", json={"rpe": 5}).status_code == 404
+
+
+def test_update_exercise_metadata(client: TestClient) -> None:
+    response = client.patch(
+        "/exercises/run1",
+        json={"distance_m": 10_000.0, "duration_s": 3000.0, "avg_hr": 150},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["distance_m"] == pytest.approx(10_000.0)
+    assert body["duration_s"] == pytest.approx(3000.0)
+    assert body["avg_hr"] == 150
+
+
+def test_update_unknown_exercise_is_404(client: TestClient) -> None:
+    assert client.patch("/exercises/missing", json={"distance_m": 1000.0}).status_code == 404
+
+
+def test_update_exercise_rejects_negative_distance(client: TestClient) -> None:
+    assert client.patch("/exercises/run1", json={"distance_m": -1.0}).status_code == 422

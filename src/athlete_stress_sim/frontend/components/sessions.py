@@ -130,3 +130,123 @@ def _detail_label(exercise: ExerciseOut) -> str:
     if exercise.avg_hr:
         parts.append(f"{exercise.avg_hr} bpm")
     return " · ".join(parts) if parts else "No telemetry"
+
+
+def edit_session_options(exercises: list[ExerciseOut]) -> list[dict[str, str]]:
+    """Build the session selector options for the manual editor."""
+    return [
+        {"value": exercise.exercise_id, "label": _edit_label(exercise)} for exercise in exercises
+    ]
+
+
+def session_editor_card() -> dmc.Paper:
+    """Build the Today card that opens the manual session editor."""
+    return dmc.Paper(
+        dmc.Stack(
+            [
+                dmc.Text(
+                    "Session data",
+                    size="xs",
+                    fw=600,
+                    tt="uppercase",
+                    style={"color": COLORS["text_muted"], "letterSpacing": "0.08em"},
+                ),
+                dmc.Text(
+                    "Correct the date, distance, duration or heart rate of any session.",
+                    size="sm",
+                    style={"color": COLORS["text_muted"]},
+                ),
+                dmc.Select(
+                    id="edit-session-select",
+                    label="Session",
+                    placeholder="Select a session",
+                    data=[],
+                    searchable=True,
+                ),
+                dmc.Text(
+                    "Select a session to edit.",
+                    id="edit-session-status",
+                    size="xs",
+                    style={"color": COLORS["text_muted"]},
+                ),
+                dmc.Button(
+                    "Edit session",
+                    id="edit-session-open",
+                    variant="light",
+                    size="xs",
+                ),
+            ],
+            gap="sm",
+        ),
+        p="lg",
+        radius="md",
+        withBorder=True,
+        style=surface_style(),
+    )
+
+
+def session_edit_modal() -> dmc.Modal:
+    """Build the modal used to correct one session's metadata."""
+    return dmc.Modal(
+        id="session-edit-modal",
+        title="Edit session",
+        opened=False,
+        centered=True,
+        children=dmc.Stack(
+            [
+                dmc.DateTimePicker(
+                    id="edit-start-time",
+                    label="Start time",
+                    value=None,
+                    clearable=False,
+                ),
+                dmc.SimpleGrid(
+                    [
+                        dmc.NumberInput(
+                            id="edit-distance",
+                            label="Distance (km)",
+                            min=0.0,
+                            step=0.1,
+                            decimalScale=2,
+                        ),
+                        dmc.NumberInput(
+                            id="edit-duration",
+                            label="Duration (min)",
+                            min=0.0,
+                            step=1.0,
+                            decimalScale=1,
+                        ),
+                        dmc.NumberInput(
+                            id="edit-avg-hr",
+                            label="Average HR (bpm)",
+                            min=0,
+                            step=1,
+                        ),
+                        dmc.NumberInput(
+                            id="edit-max-hr",
+                            label="Max HR (bpm)",
+                            min=0,
+                            step=1,
+                        ),
+                    ],
+                    cols={"base": 1, "sm": 2},
+                    spacing="sm",
+                ),
+                dmc.Text(id="edit-session-feedback", size="sm", **{"aria-live": "polite"}),
+                dmc.Group(
+                    [
+                        dmc.Button("Save changes", id="edit-session-save", variant="filled"),
+                        dmc.Button("Cancel", id="edit-session-cancel", variant="subtle"),
+                    ],
+                    justify="flex-end",
+                    wrap="wrap",
+                ),
+            ],
+            gap="sm",
+        ),
+    )
+
+
+def _edit_label(exercise: ExerciseOut) -> str:
+    kind = "Gym" if is_strength(exercise.sport, exercise.sub_sport) else "Run"
+    return f"{_date_label(exercise)} · {kind} · {_detail_label(exercise)}"

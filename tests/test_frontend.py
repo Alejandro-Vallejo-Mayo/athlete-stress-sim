@@ -10,6 +10,7 @@ import dash_mantine_components as dmc
 import httpx2
 import pytest
 
+from athlete_stress_sim.backend.schemas.exercises import ExerciseUpdate
 from athlete_stress_sim.backend.schemas.metrics import PlannedSession, TaperPlanRequest
 from athlete_stress_sim.backend.schemas.prediction import RacePredictionRequest
 from athlete_stress_sim.core.metrics.race_prediction import PredictionModel
@@ -440,6 +441,12 @@ def test_frontend_layout_has_three_tabs_and_shared_ids() -> None:
         "fitness-chart",
         "recent-sessions",
         "sessions-rpe-open",
+        "edit-session-select",
+        "edit-session-open",
+        "session-edit-modal",
+        "edit-session-save",
+        "race-baseline-btn",
+        "sim-baseline-btn",
         "refresh-btn",
         "rpe-pending-btn",
         "rpe-pending-text",
@@ -523,3 +530,34 @@ def test_empty_dashboard_returns_offline_alert() -> None:
     alert = dashboard[-1]
     assert isinstance(alert, dmc.Alert)
     assert alert.title == "Backend offline"
+
+
+def test_metrics_client_updates_exercise() -> None:
+    captured: dict[str, object] = {}
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        assert request.method == "PATCH"
+        assert request.url.path == "/exercises/run1"
+        captured.update(json.loads(request.content))
+        return httpx2.Response(
+            200,
+            json={"exercise_id": "run1", "distance_m": 10_000.0, "avg_hr": 150},
+        )
+
+    updated = _client(handler).update_exercise(
+        "run1", ExerciseUpdate(distance_m=10_000.0, avg_hr=150)
+    )
+
+    assert updated.distance_m == pytest.approx(10_000.0)
+    assert captured == {"distance_m": 10_000.0, "avg_hr": 150}
+
+
+def test_metrics_client_gets_one_exercise() -> None:
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        assert request.url.path == "/exercises/run1"
+        return httpx2.Response(200, json={"exercise_id": "run1", "avg_hr": 150})
+
+    exercise = _client(handler).get_exercise("run1")
+
+    assert exercise.exercise_id == "run1"
+    assert exercise.avg_hr == 150

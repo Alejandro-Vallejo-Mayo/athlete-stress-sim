@@ -15,8 +15,6 @@ from athlete_stress_sim.frontend.theme import COLORS, surface_style
 HALF_MARATHON_KM = 21.0975
 """Default target distance in the race predictor."""
 
-_FITNESS_EPS = 1e-6
-
 _DISTANCE_PRESETS: dict[str, float | None] = {
     "5k": 5.0,
     "10k": 10.0,
@@ -83,20 +81,24 @@ def format_pace(seconds_per_km: float | None) -> str:
 def effort_label(effort: EffortOut) -> str:
     """Build a compact label for one detected effort."""
     hr = "HR n/a" if effort.relative_hr is None else f"{effort.relative_hr:.0%} HRR"
-    label = (
+    return (
         f"{effort.distance_km:.2f} km · {format_duration(effort.time_s)} · "
-        f"{hr} · {effort.tier.value}"
+        f"{hr} · {effort.tier.value} · fitness x{effort.fitness_factor:.2f}"
     )
-    if abs(effort.fitness_factor - 1.0) > _FITNESS_EPS:
-        label += f" · fitness x{effort.fitness_factor:.2f}"
-    return label
 
 
 def effort_rows(efforts: Sequence[EffortOut]) -> list[dmc.Text]:
     """Render the detected efforts as compact text rows."""
     if not efforts:
         return [dmc.Text("No best efforts detected yet.", c="dimmed", size="sm")]
-    return [dmc.Text(effort_label(effort), size="sm") for effort in efforts]
+    return [
+        dmc.Text(
+            effort_label(effort),
+            size="sm",
+            style={"fontVariantNumeric": "tabular-nums", "color": COLORS["text_muted"]},
+        )
+        for effort in efforts
+    ]
 
 
 def note_rows(notes: Sequence[str]) -> list[dmc.Text]:
@@ -162,86 +164,33 @@ def race_predictor_panel() -> dmc.Paper:
                 ),
                 dmc.Text(id="race-result-meta", size="sm", style={"color": COLORS["text_muted"]}),
                 dmc.Stack(id="race-result-notes", gap=2),
-                dmc.Text(
-                    "Detected best efforts",
-                    fw=600,
-                    size="sm",
-                    style={"color": COLORS["text"]},
+                dmc.Group(
+                    [
+                        dmc.Select(
+                            id="race-distance-preset",
+                            label="Race distance",
+                            data=distance_options(),
+                            value="half",
+                            clearable=False,
+                            w=200,
+                        ),
+                        dmc.NumberInput(
+                            id="race-distance-custom",
+                            label="Custom distance (km)",
+                            min=1.0,
+                            max=200.0,
+                            step=0.1,
+                            style={"display": "none"},
+                            w=180,
+                        ),
+                        dmc.Button("Predict", id="race-predict", variant="filled", w=160),
+                    ],
+                    align="flex-end",
+                    gap="sm",
+                    wrap="wrap",
                 ),
-                html.Div(id="race-efforts-list"),
                 dmc.Accordion(
                     [
-                        dmc.AccordionItem(
-                            [
-                                dmc.AccordionControl("Prediction inputs"),
-                                dmc.AccordionPanel(
-                                    dmc.Stack(
-                                        [
-                                            dmc.Group(
-                                                [
-                                                    dmc.Select(
-                                                        id="race-distance-preset",
-                                                        label="Race distance",
-                                                        data=distance_options(),
-                                                        value="half",
-                                                        clearable=False,
-                                                        w=200,
-                                                    ),
-                                                    dmc.NumberInput(
-                                                        id="race-distance-custom",
-                                                        label="Custom distance (km)",
-                                                        min=1.0,
-                                                        max=200.0,
-                                                        step=0.1,
-                                                        style={"display": "none"},
-                                                        w=180,
-                                                    ),
-                                                ],
-                                                align="flex-end",
-                                                gap="sm",
-                                                wrap="wrap",
-                                            ),
-                                            dmc.Text(
-                                                "Optional race/time-trial reference",
-                                                fw=600,
-                                                size="sm",
-                                                style={"color": COLORS["text"]},
-                                            ),
-                                            dmc.Group(
-                                                [
-                                                    dmc.NumberInput(
-                                                        id="race-reference-distance",
-                                                        label="Reference distance (km)",
-                                                        min=1.0,
-                                                        max=200.0,
-                                                        step=0.1,
-                                                        w=180,
-                                                    ),
-                                                    dmc.NumberInput(
-                                                        id="race-reference-minutes",
-                                                        label="Reference time (min)",
-                                                        min=1.0,
-                                                        step=0.1,
-                                                        w=180,
-                                                    ),
-                                                ],
-                                                align="flex-end",
-                                                gap="sm",
-                                                wrap="wrap",
-                                            ),
-                                            dmc.Button(
-                                                "Predict",
-                                                id="race-predict",
-                                                variant="filled",
-                                                w=160,
-                                            ),
-                                        ],
-                                        gap="sm",
-                                    )
-                                ),
-                            ],
-                            value="inputs",
-                        ),
                         dmc.AccordionItem(
                             [
                                 dmc.AccordionControl("Advanced model"),
@@ -275,9 +224,19 @@ def race_predictor_panel() -> dmc.Paper:
                                 ),
                             ],
                             value="advanced",
-                        ),
+                        )
                     ],
-                    value="inputs",
+                ),
+                dmc.Accordion(
+                    [
+                        dmc.AccordionItem(
+                            [
+                                dmc.AccordionControl("Efforts used"),
+                                dmc.AccordionPanel(html.Div(id="race-efforts-list")),
+                            ],
+                            value="efforts",
+                        )
+                    ],
                 ),
             ],
             gap="md",

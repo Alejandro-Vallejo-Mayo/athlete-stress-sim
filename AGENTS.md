@@ -62,7 +62,7 @@ Single Python package (*src layout*), Python 3.12 (pinned in `.python-version`;
   least-squares with fixed `tau` + cross-validation gate; production path, **not** EKF).
 - `frontend/` — Dash + Mantine dashboard (dark theme); `app.py` uses an AppShell with
   Today/Trends/Plan tabs and builds on-demand callbacks. The Plan tab nests taper, what-if and
-  prediction tabs and prefills race inputs from `/metrics/running-baseline`. `theme.py` holds the
+  prediction tabs and can prefill race inputs from `/metrics/running-baseline` on demand. `theme.py` holds the
   color/spacing tokens, Mantine theme and shared Plotly layout, `readiness.py` scores freshness,
   `api.py` fetches the backend over HTTP server-side (`API_URL`, default `http://localhost:8000`;
   Docker compose sets `backend:8000`), panels live in `components/`.

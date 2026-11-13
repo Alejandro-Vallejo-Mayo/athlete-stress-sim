@@ -64,6 +64,21 @@ CREATE TABLE IF NOT EXISTS session_rpe (
 
 _DEFAULT_ATHLETE_ID = 1
 
+_EXERCISE_UPDATE_COLUMNS = frozenset(
+    {
+        "sport",
+        "sub_sport",
+        "start_time",
+        "duration_s",
+        "distance_m",
+        "calories",
+        "avg_hr",
+        "max_hr",
+        "total_ascent_m",
+        "total_descent_m",
+    }
+)
+
 
 class SessionStore:
     """Persist parsed sessions and their telemetry samples.
@@ -251,6 +266,33 @@ class SessionStore:
             connection.execute(
                 "INSERT OR REPLACE INTO session_rpe VALUES (?, ?, ?)",
                 [exercise_id, rpe, datetime.now(UTC).replace(tzinfo=None)],
+            )
+        finally:
+            connection.close()
+        self._write_revision += 1
+
+    def update_exercise(self, exercise_id: str, updates: dict[str, object]) -> None:
+        """Update editable metadata fields of one exercise.
+
+        Args:
+            exercise_id: Identifier of the persisted exercise.
+            updates: Column/value pairs to write; only allow-listed columns are
+                accepted so the SQL identifiers cannot be injected.
+
+        Raises:
+            ValueError: If ``updates`` contains an unknown column.
+        """
+        unknown = set(updates) - _EXERCISE_UPDATE_COLUMNS
+        if unknown:
+            raise ValueError(f"Unsupported exercise fields: {sorted(unknown)}")
+        if not updates:
+            return
+        assignments = ", ".join(f"{column} = ?" for column in updates)
+        connection = self._connect()
+        try:
+            connection.execute(
+                f"UPDATE exercises SET {assignments} WHERE exercise_id = ?",
+                [*updates.values(), exercise_id],
             )
         finally:
             connection.close()

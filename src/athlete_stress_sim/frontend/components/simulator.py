@@ -162,6 +162,17 @@ def simulator_panel() -> dmc.Paper:
                                         [
                                             dmc.Group(
                                                 [
+                                                    dmc.Button(
+                                                        "Use recent baseline",
+                                                        id="sim-baseline-btn",
+                                                        variant="subtle",
+                                                        size="xs",
+                                                    ),
+                                                ],
+                                                justify="flex-end",
+                                            ),
+                                            dmc.Group(
+                                                [
                                                     dmc.DateInput(
                                                         id="sim-date",
                                                         label="Date",
@@ -273,6 +284,17 @@ def race_taper_panel() -> dmc.Paper:
                                         [
                                             dmc.Group(
                                                 [
+                                                    dmc.Button(
+                                                        "Use recent baseline",
+                                                        id="race-baseline-btn",
+                                                        variant="subtle",
+                                                        size="xs",
+                                                    ),
+                                                ],
+                                                justify="flex-end",
+                                            ),
+                                            dmc.Group(
+                                                [
                                                     dmc.DateInput(
                                                         id="race-date",
                                                         label="Race date",
@@ -319,7 +341,7 @@ def race_taper_panel() -> dmc.Paper:
                                                         min=1,
                                                         max=8,
                                                         step=1,
-                                                        value=3,
+                                                        value=None,
                                                         w=140,
                                                     ),
                                                     dmc.Button(
@@ -333,8 +355,8 @@ def race_taper_panel() -> dmc.Paper:
                                                 wrap="wrap",
                                             ),
                                             dmc.Text(
-                                                "Baseline values are prefilled from your recent "
-                                                "running volume when available.",
+                                                "Start from your recent running baseline or enter "
+                                                "values manually.",
                                                 size="xs",
                                                 style={"color": COLORS["text_muted"]},
                                             ),

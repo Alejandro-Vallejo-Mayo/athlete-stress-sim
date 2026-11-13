@@ -9,14 +9,14 @@ backend metrics API in a dark theme (``RNF-04``).
 from __future__ import annotations
 
 import os
-from datetime import date
+from datetime import date, datetime
 from typing import cast
 
 import dash
 import dash_mantine_components as dmc
 from dash import Input, Output, State, ctx, dcc, html, no_update
 
-from athlete_stress_sim.backend.schemas.exercises import ExerciseOut
+from athlete_stress_sim.backend.schemas.exercises import ExerciseOut, ExerciseUpdate
 from athlete_stress_sim.backend.schemas.metrics import (
     BanisterSeriesResponse,
     CalibrationResponse,
@@ -24,10 +24,7 @@ from athlete_stress_sim.backend.schemas.metrics import (
     TaperPlanRequest,
     TaperSimulationResponse,
 )
-from athlete_stress_sim.backend.schemas.prediction import (
-    RacePredictionRequest,
-    RaceReference,
-)
+from athlete_stress_sim.backend.schemas.prediction import RacePredictionRequest
 from athlete_stress_sim.core.metrics.race_prediction import PredictionModel, format_duration
 from athlete_stress_sim.frontend.api import MetricsClient, MetricsClientError
 from athlete_stress_sim.frontend.components.acwr_gauge import acwr_risk_panel
@@ -56,7 +53,12 @@ from athlete_stress_sim.frontend.components.rpe import (
     rpe_pending_style,
     rpe_session_options,
 )
-from athlete_stress_sim.frontend.components.sessions import recent_sessions_panel
+from athlete_stress_sim.frontend.components.sessions import (
+    edit_session_options,
+    recent_sessions_panel,
+    session_edit_modal,
+    session_editor_card,
+)
 from athlete_stress_sim.frontend.components.simulator import (
     SessionData,
     build_taper_figure,
@@ -95,11 +97,29 @@ SessionOutputs = tuple[object, object, object, object, object, object, object]
 _MAX_RPE = 10.0
 
 
+def _no_rpe_change() -> tuple[bool, str, float | None, int, int]:
+    """Return no-update values for every RPE modal output."""
+    return cast(
+        tuple[bool, str, float | None, int, int],
+        (no_update, no_update, no_update, no_update, no_update),
+    )
+
+
 def _run_option(exercise: ExerciseOut) -> dict[str, str]:
     """Build one selectable option for the decoupling run selector."""
     when = exercise.start_time.date().isoformat() if exercise.start_time else "unknown"
     distance = f"{exercise.distance_m / 1000.0:.1f} km" if exercise.distance_m else "no distance"
     return {"value": exercise.exercise_id, "label": f"{when} · {distance}"}
+
+
+def _scaled_float(value: object, scale: float) -> float | None:
+    number = optional_float(value)
+    return None if number is None else number * scale
+
+
+def _int_or_none(value: object) -> int | None:
+    number = optional_float(value)
+    return None if number is None else int(number)
 
 
 def _model_label(calibration: CalibrationResponse) -> str:
@@ -268,7 +288,10 @@ def _today_tab() -> dmc.Stack:
                         freshness_panel(BanisterSeriesResponse()),
                         id="freshness-panel",
                     ),
-                    rpe_pending_card(),
+                    dmc.Stack(
+                        [rpe_pending_card(), session_editor_card()],
+                        gap="md",
+                    ),
                 ],
                 cols={"base": 1, "lg": 2},
                 spacing="md",
@@ -362,6 +385,7 @@ def create_app(client: MetricsClient | None = None) -> dash.Dash:
                                 ),
                             ),
                             rpe_modal(),
+                            session_edit_modal(),
                             dcc.Store(id="sim-sessions", data=[]),
                             dcc.Store(id="data-refreshed", data=0),
                             dcc.Store(id="rpe-refresh", data=0),
@@ -539,39 +563,55 @@ def create_app(client: MetricsClient | None = None) -> dash.Dash:
     _register_race_taper_callbacks(app, metrics_client)
     _register_race_predictor_callbacks(app, metrics_client)
     _register_plan_prefill(app, metrics_client)
+    _register_session_editor_callbacks(app, metrics_client)
     return app
 
 
 def _register_plan_prefill(app: dash.Dash, client: MetricsClient) -> None:
-    """Prefill planning inputs from the recent running baseline on first load."""
+    """Fill planning inputs on demand from the recent running baseline."""
 
     @app.callback(
         Output("race-base-km", "value"),
         Output("race-runs", "value"),
         Output("race-pace", "value"),
         Output("race-rpe", "value"),
+        Output("race-weeks", "value"),
         Output("sim-distance", "value"),
         Output("sim-pace", "value"),
         Output("sim-rpe", "value"),
-        Input("init", "n_intervals"),
+        Input("race-baseline-btn", "n_clicks"),
+        Input("sim-baseline-btn", "n_clicks"),
+        prevent_initial_call=True,
     )
-    def prefill_plan_inputs(_interval: int | None) -> tuple[object, ...]:
-        """Populate the plan forms with the athlete's recent running baseline."""
+    def apply_baseline(_race_clicks: int | None, _sim_clicks: int | None) -> tuple[object, ...]:
+        """Populate one planning form with the athlete's recent running baseline."""
         try:
             baseline = client.get_running_baseline()
         except MetricsClientError:
-            return (no_update,) * 7
+            return (no_update,) * 8
         if baseline is None:
-            return (no_update,) * 7
+            return (no_update,) * 8
         weekly_km = round(baseline.weekly_km, 1)
         pace = round(baseline.pace_min_per_km, 1)
         rpe = round(baseline.rpe, 1)
         typical_km = max(1.0, round(weekly_km / baseline.runs_per_week, 1))
+        if ctx.triggered_id == "race-baseline-btn":
+            return (
+                weekly_km,
+                baseline.runs_per_week,
+                pace,
+                rpe,
+                3,
+                no_update,
+                no_update,
+                no_update,
+            )
         return (
-            weekly_km,
-            baseline.runs_per_week,
-            pace,
-            rpe,
+            no_update,
+            no_update,
+            no_update,
+            no_update,
+            no_update,
             typical_km,
             pace,
             rpe,
@@ -611,8 +651,6 @@ def _register_race_predictor_callbacks(app: dash.Dash, client: MetricsClient) ->
         Input("race-predict", "n_clicks"),
         State("race-distance-preset", "value"),
         State("race-distance-custom", "value"),
-        State("race-reference-distance", "value"),
-        State("race-reference-minutes", "value"),
         State("race-model", "value"),
         State("race-exponent", "value"),
         prevent_initial_call=True,
@@ -621,8 +659,6 @@ def _register_race_predictor_callbacks(app: dash.Dash, client: MetricsClient) ->
         _clicks: int | None,
         preset: str | None,
         custom_distance_km: object,
-        reference_distance_km: object,
-        reference_minutes: object,
         model_value: str | None,
         exponent_value: object,
     ) -> tuple[object, object, object, object, list[object], list[object]]:
@@ -632,23 +668,6 @@ def _register_race_predictor_callbacks(app: dash.Dash, client: MetricsClient) ->
         )
         if target_distance is None or target_distance <= 0.0:
             return ("—", "—", "", "Enter a target distance.", [], [])
-        reference_km = optional_float(reference_distance_km)
-        reference_min = optional_float(reference_minutes)
-        if (reference_km is None) != (reference_min is None):
-            return (
-                "—",
-                "—",
-                "",
-                "Provide both reference distance and time, or neither.",
-                [],
-                [],
-            )
-        reference = None
-        if reference_km is not None and reference_min is not None:
-            reference = RaceReference(
-                distance_km=reference_km,
-                time_s=reference_min * 60.0,
-            )
         model = PredictionModel(model_value) if model_value else PredictionModel.AUTO
         exponent = optional_float(exponent_value) or 1.06
         try:
@@ -656,7 +675,6 @@ def _register_race_predictor_callbacks(app: dash.Dash, client: MetricsClient) ->
                 RacePredictionRequest(
                     distance_km=target_distance,
                     model=model,
-                    reference=reference,
                     exponent=exponent,
                 )
             )
@@ -763,7 +781,13 @@ def _register_rpe_callbacks(app: dash.Dash, client: MetricsClient) -> None:
         """Open/close the modal, save RPEs and refresh the dashboard."""
         current = counter or 0
         metrics_current = metrics or 0
-        if ctx.triggered_id in {"rpe-pending-btn", "rpe-card-open", "sessions-rpe-open"}:
+        if ctx.triggered_id == "rpe-pending-btn":
+            return (True, "", None, current, metrics_current) if _open else _no_rpe_change()
+        if ctx.triggered_id == "rpe-card-open":
+            return (True, "", None, current, metrics_current) if _card_open else _no_rpe_change()
+        if ctx.triggered_id == "sessions-rpe-open":
+            if not _sessions_open:
+                return _no_rpe_change()
             return (True, "", None, current, metrics_current)
         if ctx.triggered_id == "rpe-cancel":
             return (False, "", None, current, metrics_current)
@@ -802,6 +826,105 @@ def _register_rpe_callbacks(app: dash.Dash, client: MetricsClient) -> None:
         except MetricsClientError:
             exercises = []
         return recent_sessions_panel(exercises)
+
+
+def _register_session_editor_callbacks(app: dash.Dash, client: MetricsClient) -> None:
+    """Register the manual session editor card, modal and save action."""
+
+    @app.callback(
+        Output("edit-session-select", "data"),
+        Output("edit-session-select", "value"),
+        Input("data-refreshed", "data"),
+    )
+    def load_edit_sessions(_refreshed: int | None) -> tuple[list[dict[str, str]], str | None]:
+        """Populate the session selector with the persisted history."""
+        try:
+            exercises = client.get_exercises("all")
+        except MetricsClientError:
+            return [], None
+        options = edit_session_options(exercises)
+        return options, (options[0]["value"] if options else None)
+
+    @app.callback(
+        Output("session-edit-modal", "opened"),
+        Output("edit-session-feedback", "children"),
+        Output("edit-start-time", "value"),
+        Output("edit-distance", "value"),
+        Output("edit-duration", "value"),
+        Output("edit-avg-hr", "value"),
+        Output("edit-max-hr", "value"),
+        Output("edit-session-status", "children"),
+        Input("edit-session-open", "n_clicks"),
+        State("edit-session-select", "value"),
+        prevent_initial_call=True,
+    )
+    def open_session_editor(  # noqa: PLR0917
+        _clicks: int | None,
+        exercise_id: str | None,
+    ) -> tuple[object, ...]:
+        """Load one session's current values into the edit modal."""
+        if not exercise_id:
+            return (False, "", None, None, None, None, None, "Select a session first.")
+        try:
+            exercise = client.get_exercise(exercise_id)
+        except MetricsClientError:
+            return (False, "", None, None, None, None, None, "Backend offline.")
+        return (
+            True,
+            "",
+            exercise.start_time.isoformat() if exercise.start_time else None,
+            _scaled_float(exercise.distance_m, 0.001),
+            _scaled_float(exercise.duration_s, 1.0 / 60.0),
+            exercise.avg_hr,
+            exercise.max_hr,
+            "",
+        )
+
+    @app.callback(
+        Output("session-edit-modal", "opened"),
+        Output("edit-session-feedback", "children"),
+        Output("metric-refresh", "data"),
+        Output("edit-session-status", "children"),
+        Input("edit-session-save", "n_clicks"),
+        Input("edit-session-cancel", "n_clicks"),
+        State("edit-session-select", "value"),
+        State("edit-start-time", "value"),
+        State("edit-distance", "value"),
+        State("edit-duration", "value"),
+        State("edit-avg-hr", "value"),
+        State("edit-max-hr", "value"),
+        State("metric-refresh", "data"),
+        prevent_initial_call=True,
+    )
+    def save_session_editor(  # noqa: PLR0917
+        _save: int | None,
+        _cancel: int | None,
+        exercise_id: str | None,
+        start_time_value: str | None,
+        distance_km: object,
+        duration_min: object,
+        avg_hr: object,
+        max_hr: object,
+        metrics: int | None,
+    ) -> tuple[bool, str, int, str]:
+        """Persist the edited session fields and refresh the dashboard."""
+        metrics_current = metrics or 0
+        if ctx.triggered_id == "edit-session-cancel":
+            return (False, "", metrics_current, "")
+        if not exercise_id:
+            return (True, "Select a session first.", metrics_current, "")
+        try:
+            update = ExerciseUpdate(
+                start_time=datetime.fromisoformat(start_time_value) if start_time_value else None,
+                distance_m=_scaled_float(distance_km, 1000.0),
+                duration_s=_scaled_float(duration_min, 60.0),
+                avg_hr=_int_or_none(avg_hr),
+                max_hr=_int_or_none(max_hr),
+            )
+            client.update_exercise(exercise_id, update)
+        except (MetricsClientError, ValueError):
+            return (True, "Could not save the session.", metrics_current, "")
+        return (False, "Session updated.", metrics_current + 1, "Session updated.")
 
 
 def _register_race_taper_callbacks(app: dash.Dash, client: MetricsClient) -> None:
