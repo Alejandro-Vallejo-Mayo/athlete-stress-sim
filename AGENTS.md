@@ -88,8 +88,9 @@ Single Python package (*src layout*), Python 3.12 (pinned in `.python-version`;
   enough synthetic performance points.
 - FIT fixtures are synthesized in memory by `tests/helpers/fit_fixture.py`; never commit real
   biometric data (`RNF-01`). `data/raw/` may hold local real FIT files — do not add or commit them.
-- `README.md` is a stub; public documentation lives in `docs/` (`product-requirements.md`,
-  `roadmap.md`, `user-guide.md`, `architecture.md`, `mathematical-model.md`, `validation.md`).
-  Status: S1–S14 done (real-data validation; NLS replaced the old EKF), S15 done (DuckDB batch
-  reads/cache, runtime Docker images, CI coverage gate); S16 (public README and release) pending.
-  Confirm the GitHub Actions run after pushing.
+- `README.md` is the public entry point; the deep documentation lives in `docs/`
+  (`product-requirements.md`, `roadmap.md`, `user-guide.md`, `architecture.md`,
+  `mathematical-model.md`, `validation.md`). Status: S1–S14 done (real-data validation; NLS
+  replaced the old EKF), S15 done (DuckDB batch reads/cache, runtime Docker images, CI coverage
+  gate); S16 (dashboard captures and release) pending. Confirm the GitHub Actions run after
+  pushing.

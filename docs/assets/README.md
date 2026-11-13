@@ -10,7 +10,7 @@ Drop the screenshots in this directory using these exact file names:
 | --- | --- |
 | `dashboard-today.png` | **Today** tab: daily status, ACWR and quick stats. |
 | `dashboard-trends.png` | **Trends** tab: fitness, fatigue, freshness and decoupling. |
-| `dashboard-tapering.png` | **Plan → Tapering simulator** with a visible projection. |
+| `dashboard-tapering.png` | **Plan → What-if** with a visible projection. |
 | `dashboard-race-taper.png` | **Plan → Race taper** with a generated plan. |
 | `dashboard-race-predictor.png` | **Plan → Race predictor** with a visible prediction. |
 

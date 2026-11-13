@@ -897,7 +897,7 @@ Known test-boundary details:
 - [`user-guide.md`](user-guide.md) — dashboard interpretation, configuration and troubleshooting.
 - [`mathematical-model.md`](mathematical-model.md) — derivations, calibration objective and references.
 - [`validation.md`](validation.md) — real-data validation, calibration diagnostics and performance.
-- `README.md` — public overview and quick start (S16).
+- [`README.md`](../README.md) — public overview and quick start.
 
 > The code remains the source of truth for exact signatures and constants. This
 > document is the architectural map; the mathematical model document owns the

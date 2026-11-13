@@ -541,9 +541,8 @@ observations, the calibration improves cross-validated RMSE but does not explain
 enough in-sample variance, so the system does **not** pretend to be calibrated.
 This is the intended behavior for a personal tool built on limited, noisy data.
 
-The remaining work for `v1.0.0` is documentation and release packaging: public
-README, real dashboard captures, final secret review, license/changelog and the
-release tag.
+The remaining work for `v1.0.0` is release packaging: dashboard captures, final
+secret review, license/changelog and the release tag.
 
 ---
 
@@ -554,4 +553,4 @@ release tag.
 - [`architecture.md`](architecture.md) — runtime topology, caching and failure modes.
 - [`mathematical-model.md`](mathematical-model.md) — model definitions, calibration gate and limitations.
 - [`user-guide.md`](user-guide.md) — dashboard interpretation and troubleshooting.
-- `README.md` — public overview and quick start (S16).
+- [`README.md`](../README.md) — public overview and quick start.

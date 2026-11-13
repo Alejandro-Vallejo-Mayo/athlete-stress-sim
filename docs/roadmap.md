@@ -384,8 +384,8 @@ NLS with fixed `tau` + ridge and a CV gate; kept as a historical reference.*
 **Objective:** close the project in a presentable state.
 
 - [~] Public `README.md` in English with:
-  - [ ] Mathematical explanation (LaTeX equations).
-  - [ ] Architecture diagram.
+  - [x] Mathematical explanation (LaTeX equations).
+  - [x] Architecture diagram.
   - [ ] Real dashboard captures.
 - [x] Translate the PRD to English and update it to the as-built state.
 - [x] Translate the roadmap to English and update it to the as-built state.

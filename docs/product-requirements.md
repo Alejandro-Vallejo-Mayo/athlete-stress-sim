@@ -797,7 +797,7 @@ The project is considered complete when:
 - [`architecture.md`](architecture.md) — system design, data flows and technical debt.
 - [`mathematical-model.md`](mathematical-model.md) — derivations, calibration and references.
 - [`validation.md`](validation.md) — real-data validation, calibration diagnostics and performance.
-- `README.md` — public project overview and quick start (S16).
+- [`README.md`](../README.md) — public project overview and quick start.
 
 > The S16 technical deep dives live under `docs/` and are linked from the public
-> README once the documentation set is complete.
+> README.
