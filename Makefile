@@ -36,9 +36,12 @@ test-cov: ## Run tests with coverage (80% threshold on core)
 	$(UV) run pytest --cov
 
 run-backend: ## Start the FastAPI backend in development mode
+	@printf "\n\033[1mBackend API:\033[0m \033[36mhttp://localhost:8000\033[0m\n"
+	@printf "API docs:    \033[36mhttp://localhost:8000/docs\033[0m\n\n"
 	$(UV) run athlete-stress-sim
 
 run-frontend: ## Start the Dash dashboard in development mode
+	@printf "\n\033[1mDashboard:\033[0m \033[36mhttp://localhost:8050\033[0m\n\n"
 	$(UV) run python -m athlete_stress_sim.frontend.app
 
 db: ## Open an interactive shell on the local DuckDB (variable `con`)
