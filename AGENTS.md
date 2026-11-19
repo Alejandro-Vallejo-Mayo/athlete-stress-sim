@@ -35,9 +35,9 @@ Single Python package (*src layout*), Python 3.12 (pinned in `.python-version`;
 
 ## Conventions
 
-- Load the `python-conventions` skill before writing/reviewing Python. All code artifacts
-  (identifiers, comments, docstrings, commit/branch names, build/config comments) are **English**;
-  `athlete-stress-sim-PRD.md`, `ROADMAP.md` and `docs/guia-funcionalidades.md` are Spanish and exempt.
+- Load the `python-conventions` skill before writing/reviewing Python. All code and documentation
+  artifacts (identifiers, comments, docstrings, commit/branch names, build/config comments and
+  public docs) are **English**; public documentation lives under `docs/`.
 - PEP 257 docstrings (Google-style `Args`/`Returns`/`Raises`). Reference PRD requirement IDs
   (`RF-xx`/`RNF-xx`) and sprint tags (`S1`–`S16`) where relevant.
 - Conventional commits (`feat:`, `refactor:`, ...). CI triggers on `main`/`develop`/`feature/**`
@@ -68,7 +68,8 @@ Single Python package (*src layout*), Python 3.12 (pinned in `.python-version`;
   Docker compose sets `backend:8000`), panels live in `components/`.
 - Not strictly layered: `core/etl/` imports `backend.config` for Polar settings, `frontend/`
   imports `backend.schemas` and `core` types, and `api/prediction.py` reuses the private helpers
-  `_assemble_daily_loads`/`_calibration` from `api/metrics.py`. Check that before moving modules.
+  `_assemble_daily_loads`, `_calibration`, `_load_session_data` and `_SessionData` from
+  `api/metrics.py`. Check that before moving modules.
 - Config uses pydantic-settings with env prefixes `ATHLETE_` / `POLAR_`; `.env` is loaded from the
   current working directory and is git-ignored (use `.env.example`; never read or echo the local
   `.env`, it holds real credentials).
@@ -88,7 +89,8 @@ Single Python package (*src layout*), Python 3.12 (pinned in `.python-version`;
   enough synthetic performance points.
 - FIT fixtures are synthesized in memory by `tests/helpers/fit_fixture.py`; never commit real
   biometric data (`RNF-01`). `data/raw/` may hold local real FIT files — do not add or commit them.
-- `README.md` is a stub; product intent lives in `athlete-stress-sim-PRD.md`, `ROADMAP.md` and the
-  user-facing `docs/guia-funcionalidades.md`. Status: S1–S14 done (real-data validation; NLS
-  replaced the old EKF), S15 done (DuckDB batch reads/cache, runtime Docker images, CI coverage
-  gate); S16 (public README) pending. Confirm the GitHub Actions run after pushing.
+- `README.md` is the public entry point; the deep documentation lives in `docs/`
+  (`product-requirements.md`, `roadmap.md`, `user-guide.md`, `architecture.md`,
+  `mathematical-model.md`, `validation.md`). Status: S1–S16 done (real-data validation; NLS
+  replaced the old EKF; DuckDB batch reads/cache; runtime Docker images; CI coverage gate;
+  dashboard captures and final documentation). The `v1.0.0` release is tagged and published.

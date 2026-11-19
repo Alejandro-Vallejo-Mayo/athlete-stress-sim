@@ -1,7 +1,7 @@
 [project]
 name = "athlete-stress-sim"
-version = "0.1.0"
-description = "Biomechanical Fatigue & Load Management Optimizer"
+version = "1.0.0"
+description = "Local-first training-load, fitness-fatigue and race-readiness platform for Polar telemetry"
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
 license = { text = "MIT" }
@@ -12,7 +12,6 @@ keywords = ["running", "fatigue", "trimp", "acwr", "banister", "polar"]
 dependencies = [
     "numpy>=1.26",
     "scipy>=1.11",
-    "statsmodels>=0.14",
     "fitparse>=1.2",
     "duckdb>=1.0",
     "fastapi>=0.111",

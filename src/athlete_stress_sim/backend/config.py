@@ -26,10 +26,10 @@ class PhysiologicalConfig(BaseSettings):
     )
 
     hr_max: int = Field(default=200, gt=0, description="Maximum heart rate (bpm).")
-    hr_rest: int = Field(default=55, gt=0, description="Resting heart rate (bpm).")
+    hr_rest: int = Field(default=60, gt=0, description="Resting heart rate (bpm).")
 
-    tau_1: float = Field(default=45.0, gt=0, description="Fitness time constant (days).")
-    tau_2: float = Field(default=15.0, gt=0, description="Fatigue time constant (days).")
+    tau_1: float = Field(default=42.0, gt=0, description="Fitness time constant (days).")
+    tau_2: float = Field(default=7.0, gt=0, description="Fatigue time constant (days).")
 
     k_1: float = Field(default=1.0, description="Fitness gain.")
     k_2: float = Field(default=2.0, description="Fatigue gain.")

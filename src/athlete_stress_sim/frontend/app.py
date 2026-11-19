@@ -287,6 +287,7 @@ def _today_tab() -> dmc.Stack:
                     html.Div(
                         freshness_panel(BanisterSeriesResponse()),
                         id="freshness-panel",
+                        style={"height": "100%"},
                     ),
                     dmc.Stack(
                         [rpe_pending_card(), session_editor_card()],
@@ -576,9 +577,9 @@ def _register_plan_prefill(app: dash.Dash, client: MetricsClient) -> None:
         Output("race-pace", "value"),
         Output("race-rpe", "value"),
         Output("race-weeks", "value"),
-        Output("sim-distance", "value"),
-        Output("sim-pace", "value"),
-        Output("sim-rpe", "value"),
+        Output("sim-distance", "value", allow_duplicate=True),
+        Output("sim-pace", "value", allow_duplicate=True),
+        Output("sim-rpe", "value", allow_duplicate=True),
         Input("race-baseline-btn", "n_clicks"),
         Input("sim-baseline-btn", "n_clicks"),
         prevent_initial_call=True,
@@ -881,10 +882,10 @@ def _register_session_editor_callbacks(app: dash.Dash, client: MetricsClient) ->
         )
 
     @app.callback(
-        Output("session-edit-modal", "opened"),
-        Output("edit-session-feedback", "children"),
-        Output("metric-refresh", "data"),
-        Output("edit-session-status", "children"),
+        Output("session-edit-modal", "opened", allow_duplicate=True),
+        Output("edit-session-feedback", "children", allow_duplicate=True),
+        Output("metric-refresh", "data", allow_duplicate=True),
+        Output("edit-session-status", "children", allow_duplicate=True),
         Input("edit-session-save", "n_clicks"),
         Input("edit-session-cancel", "n_clicks"),
         State("edit-session-select", "value"),
