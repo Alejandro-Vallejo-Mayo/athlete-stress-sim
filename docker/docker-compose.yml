@@ -1,0 +1,33 @@
+name: athlete-stress-sim
+
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    image: athlete-stress-sim-backend:latest
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: ../.env
+        required: false
+    volumes:
+      - ../data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+    image: athlete-stress-sim-frontend:latest
+    ports:
+      - "8050:8050"
+    environment:
+      API_URL: http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
