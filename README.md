@@ -47,8 +47,13 @@ data/physiology pipeline.
 - [Engineering highlights](#engineering-highlights)
 - [Validation and results](#validation-and-results)
 - [Testing and quality](#testing-and-quality)
+- [Project structure](#project-structure)
 - [Documentation](#documentation)
+- [Contributing](#contributing)
+- [Security and privacy](#security-and-privacy)
 - [Limitations and scope](#limitations-and-scope)
+- [Status](#status)
+- [License](#license)
 
 ---
 
@@ -148,9 +153,9 @@ and failure modes are documented in [`docs/architecture.md`](docs/architecture.m
 
 ## Mathematical core
 
-The production model is documented in detail in
-[`docs/mathematical-model.md`](docs/mathematical-model.md), including assumptions,
-worked examples and scientific references.
+The equations below are a summary. The canonical derivations, assumptions,
+worked examples and scientific references live in
+[`docs/mathematical-model.md`](docs/mathematical-model.md).
 
 **Running/elliptical load** — Banister TRIMP integrated over the heart-rate series:
 
@@ -204,14 +209,21 @@ I get here?**, and **what should I do next?**
 ### Today
 
 The hero capture above shows the **Today** view: readiness, freshness, ACWR,
-at-a-glance stats, pending gym RPE and session-data correction.
+at-a-glance stats, gym-RPE status and session-data correction.
 
-### Trends
+### Trends — Training load
 
-Fitness, fatigue and freshness over time, aerobic decoupling for a selected run,
-and recent sessions with RPE status.
+Fitness, fatigue and freshness over time, with range controls and the current
+values shown as chips.
 
-<img src="docs/assets/dashboard-trends.png" alt="Trends tab with training load, aerobic decoupling and recent sessions" width="100%" />
+<img src="docs/assets/dashboard-load.png" alt="Trends tab with fitness, fatigue and freshness over time" width="100%" />
+
+### Trends — Aerobic decoupling
+
+Per-kilometer efficiency factor for a selected run, with first-half and
+second-half decoupling.
+
+<img src="docs/assets/dashboard-decoupling.png" alt="Trends tab with per-kilometer efficiency factor and aerobic decoupling" width="100%" />
 
 ### Plan — Race taper
 
@@ -266,6 +278,9 @@ Fill in:
 - `POLAR_CLIENT_ID`
 - `POLAR_CLIENT_SECRET`
 - `POLAR_REDIRECT_URI` (default `http://localhost:8000/auth/callback`)
+
+The example also contains user-zero physiological priors (`ATHLETE_*`). Adjust
+them to your own physiology; the code defaults are used when a variable is absent.
 
 Create the AccessLink client at <https://admin.polaraccesslink.com/> and register
 the same redirect URI. Then start the backend and open `GET /auth/login` to link
@@ -386,6 +401,13 @@ DuckDB databases. No test requires network access or real biometric data.
 Coverage is enforced over `src/athlete_stress_sim/core`; backend and frontend are
 covered by tests but excluded from the numerical gate.
 
+### Data availability
+
+The repository does not include real FIT files, the DuckDB database, OAuth tokens
+or credentials. The validation report describes the local snapshot with aggregate
+counts and derived diagnostics only. The test suite is fully synthetic and runs
+without network access or real biometric data.
+
 ---
 
 ## Project structure
@@ -404,6 +426,10 @@ athlete-stress-sim/
 ├── docs/                     # PRD, roadmap, architecture, math, validation, user guide
 ├── docker/                   # Dockerfiles and Compose topology
 ├── data/                     # local DuckDB + raw FIT files (git-ignored)
+├── LICENSE
+├── CHANGELOG.md
+├── CONTRIBUTING.md
+├── SECURITY.md
 ├── Makefile
 ├── pyproject.toml
 └── uv.lock
@@ -416,12 +442,43 @@ athlete-stress-sim/
 | Document | What it covers |
 | --- | --- |
 | [`docs/product-requirements.md`](docs/product-requirements.md) | Product scope, requirement IDs, success criteria and as-built status |
-| [`docs/roadmap.md`](docs/roadmap.md) | 16-week delivery plan, sprint status, risks and MoSCoW |
+| [`docs/roadmap.md`](docs/roadmap.md) | 16-week delivery record, sprint status, risks and MoSCoW |
 | [`docs/user-guide.md`](docs/user-guide.md) | Dashboard interpretation, configuration, endpoints and troubleshooting |
 | [`docs/architecture.md`](docs/architecture.md) | Runtime topology, components, data model, flows and technical debt |
-| [`docs/mathematical-model.md`](docs/mathematical-model.md) | Equations, calibration, assumptions and scientific references |
+| [`docs/mathematical-model.md`](docs/mathematical-model.md) | Canonical equations, calibration, assumptions and scientific references |
 | [`docs/validation.md`](docs/validation.md) | Real-data snapshot, calibration diagnostics, performance and validity |
 | [`docs/assets/README.md`](docs/assets/README.md) | Dashboard capture names and guidelines |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Development workflow, quality gates and contribution guidelines |
+| [`SECURITY.md`](SECURITY.md) | Security model, deployment assumptions and private reporting |
+| [`CHANGELOG.md`](CHANGELOG.md) | Release history and notable changes |
+| [`LICENSE`](LICENSE) | MIT license |
+
+---
+
+## Contributing
+
+This is a personal, single-user project, but focused issues and pull requests are
+welcome. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the development setup, the
+definition of done and the documentation conventions.
+
+Before opening a pull request:
+
+```bash
+make install
+make lint && make typecheck && make test-cov
+```
+
+---
+
+## Security and privacy
+
+The system is designed for a single trusted user on localhost or a trusted local
+network. It has no API authentication, no TLS and no multi-user isolation; do not
+expose ports `8000` or `8050` to the internet.
+
+- Biometric data stays in `data/athleta.duckdb` and `data/raw/`.
+- `.env`, OAuth tokens, raw FIT files and the database are git-ignored.
+- Report vulnerabilities privately as described in [`SECURITY.md`](SECURITY.md).
 
 ---
 
@@ -446,12 +503,16 @@ athlete-stress-sim/
 
 ## Status
 
-**v1.0.0 — public release preparation.** The implementation, English
-documentation, validation report and real-data checks are complete. The remaining
-steps are the dashboard captures, the final secret review and the public release
-tag. Delivery history and open items live in [`docs/roadmap.md`](docs/roadmap.md).
+**v1.0.0 — final release.** The implementation, English documentation, validation
+report and dashboard captures are complete. Delivery history lives in
+[`docs/roadmap.md`](docs/roadmap.md); release notes live in
+[`CHANGELOG.md`](CHANGELOG.md).
 
 **Author:** Alejandro Vallejo Mayo — Double Degree in Mathematics and Computer
 Engineering, University of Seville.
 
-**License:** MIT.
+---
+
+## License
+
+Released under the MIT License. See [`LICENSE`](LICENSE).
