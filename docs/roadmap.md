@@ -9,7 +9,7 @@
 > - **User zero:** personal preparation for a first half marathon (3 running days + 3 gym days)
 > - **Device:** Polar Ignite (Polar AccessLink API)
 > - **Requirement source:** [`product-requirements.md`](product-requirements.md) (v1.2.0)
-> - **Status:** S1–S16 delivered · `v1.0.0` complete (tag pending final push)
+> - **Status:** S1–S16 delivered · `v1.0.0` released
 > - **Last updated:** 2026-11-19
 
 ---
@@ -109,16 +109,17 @@ good form.
 | **F0** | 1 | S1–S4 | Foundations, Polar and DuckDB | Raw telemetry persisted | Done |
 | **F1** | 2 | S5–S9 | Physiological engine | TRIMP, ACWR, ODE and calibration functional | Done |
 | **F2** | 3 | S10–S13 | API + dashboard | Interactive dashboard and simulator | Done |
-| **F3** | 4 | S14–S16 | Real use, validation and portfolio | Validated system + public documentation | Done (tag pending) |
+| **F3** | 4 | S14–S16 | Real use, validation and portfolio | Validated system + public documentation | Done |
 
 ### 4.1 Status summary
 
 - **S1–S16:** delivered. The S14 maintenance item is closed; no blocking defects
   were found.
 - **S16:** documentation complete, including the public README, dashboard
-  captures, secret review, license, changelog, contribution and security files.
-- **Release:** `v1.0.0` documentation is complete. The release tag is created
-  after the final push and CI confirmation.
+  captures, secret review, license, changelog, contribution and security files,
+  and the `v1.0.0` release.
+- **Release:** `v1.0.0` is tagged and published. The public README, documentation,
+  validation report and dashboard captures are part of the release.
 
 ---
 
@@ -400,7 +401,7 @@ NLS with fixed `tau` + ridge and a CV gate; kept as a historical reference.*
 - [x] Review exposed credentials and clean up secrets. No tracked `.env`, `.fit`,
   `.duckdb`, `.pem` or `.key` files and no real credentials in versioned content.
 - [x] Add `LICENSE` (MIT), `CHANGELOG.md`, `CONTRIBUTING.md` and `SECURITY.md`.
-- [~] Tag the `v1.0.0` release. Pending the final push and CI confirmation.
+- [x] Tag the `v1.0.0` release and publish the GitHub Release.
 
 ---
 

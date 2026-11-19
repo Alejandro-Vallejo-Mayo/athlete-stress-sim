@@ -542,8 +542,7 @@ enough in-sample variance, so the system does **not** pretend to be calibrated.
 This is the intended behavior for a personal tool built on limited, noisy data.
 
 The release documentation, dashboard captures, secret review and
-license/changelog are complete. The only remaining step is the `v1.0.0` tag after
-the final push and CI confirmation.
+license/changelog are complete. The `v1.0.0` release is tagged and published.
 
 ---
 

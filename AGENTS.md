@@ -93,5 +93,4 @@ Single Python package (*src layout*), Python 3.12 (pinned in `.python-version`;
   (`product-requirements.md`, `roadmap.md`, `user-guide.md`, `architecture.md`,
   `mathematical-model.md`, `validation.md`). Status: S1–S16 done (real-data validation; NLS
   replaced the old EKF; DuckDB batch reads/cache; runtime Docker images; CI coverage gate;
-  dashboard captures and final documentation). The `v1.0.0` tag is created after the final push
-  and CI confirmation.
+  dashboard captures and final documentation). The `v1.0.0` release is tagged and published.

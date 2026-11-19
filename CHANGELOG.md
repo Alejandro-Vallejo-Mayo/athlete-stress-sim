@@ -37,7 +37,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- Unused `statsmodels` dependency.
-
 [Unreleased]: https://github.com/Alejandro-Vallejo-Mayo/athlete-stress-sim/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/Alejandro-Vallejo-Mayo/athlete-stress-sim/releases/tag/v1.0.0

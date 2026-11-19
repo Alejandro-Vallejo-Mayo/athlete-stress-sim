@@ -5,7 +5,7 @@
 <h3>Local-first training-load, fitness-fatigue and race-readiness platform</h3>
 
 [![CI](https://github.com/Alejandro-Vallejo-Mayo/athlete-stress-sim/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Alejandro-Vallejo-Mayo/athlete-stress-sim/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/badge/release-v1.0.0-2ea44f?style=flat-square)](CHANGELOG.md)
+[![Release](https://img.shields.io/badge/release-v1.0.0-2ea44f?style=flat-square)](https://github.com/Alejandro-Vallejo-Mayo/athlete-stress-sim/releases/tag/v1.0.0)
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![uv](https://img.shields.io/badge/managed_with-uv-DE5FE1?style=flat-square)](https://docs.astral.sh/uv/)
 [![DuckDB](https://img.shields.io/badge/DuckDB-OLAP-FFF000?style=flat-square)](https://duckdb.org/)
@@ -521,9 +521,9 @@ expose ports `8000` or `8050` to the internet.
 
 ## Status
 
-**v1.0.0 — release documentation complete.** The implementation, English
-documentation, validation report, dashboard captures and release files are
-complete. The `v1.0.0` tag is created after the final push and CI confirmation.
+**v1.0.0 — released.** The implementation, English documentation, validation
+report, dashboard captures and release files are complete. The release is
+available at [`v1.0.0`](https://github.com/Alejandro-Vallejo-Mayo/athlete-stress-sim/releases/tag/v1.0.0).
 Delivery history lives in [`docs/roadmap.md`](docs/roadmap.md); release notes live
 in [`CHANGELOG.md`](CHANGELOG.md).
 

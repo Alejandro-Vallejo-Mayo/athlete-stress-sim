@@ -797,8 +797,8 @@ permissions.
 ### 15.4 Release state
 
 The `v1.0.0` documentation, screenshot and secret-review checklist is complete.
-The tag is created after the final push and CI confirmation. The public README
-and technical deep dives are released together with that tag.
+The release is tagged and published. The public README and technical deep dives
+are part of it.
 
 ---
 
