@@ -120,7 +120,7 @@ work, then combines both into one relative daily series.
 Heart-rate intensity is normalized with the heart-rate reserve fraction:
 
 $$
-HR_r = \operatorname{clamp}\!\left(
+HR_r = \mathrm{clamp}\!\left(
 \frac{HR - HR_{\text{rest}}}{HR_{\max} - HR_{\text{rest}}},
 0, 1
 \right)
@@ -412,7 +412,7 @@ sessions provide observations; strength sessions have no comparable speed.
 Observations are normalized by their median to make the fit scale-free:
 
 $$
-y_s = \frac{EF_s}{\operatorname{median}(EF)}
+y_s = \frac{EF_s}{\mathrm{median}(EF)}
 $$
 
 Multiple sessions on the same day are averaged. The observation is mapped to the
@@ -455,13 +455,13 @@ their standard deviations before solving, and the bounded problem is solved with
 coefficient vector is shaped to the prior freshness amplitude:
 
 $$
-s = \frac{\operatorname{std}(y)}{\operatorname{std}(F_{\text{prior}})}
+s = \frac{\mathrm{std}(y)}{\mathrm{std}(F_{\text{prior}})}
 $$
 
 $$
 \beta_{\text{prior}} =
 \left(
-1 - s \cdot \operatorname{median}(F_{\text{prior}}),
+1 - s \cdot \mathrm{median}(F_{\text{prior}}),
 \; s k_1,\;
 s k_2
 \right)
@@ -502,8 +502,8 @@ freshness stays in the same load units as the rest of the dashboard:
 
 $$
 s_{\text{rescale}} =
-\frac{\operatorname{std}(F_{\text{prior}})}
-{\operatorname{std}(F_{\text{fit}})}
+\frac{\mathrm{std}(F_{\text{prior}})}
+{\mathrm{std}(F_{\text{fit}})}
 $$
 
 $$
@@ -760,7 +760,7 @@ The tiers are:
 Each effort is adjusted by the Banister fitness change since its date:
 
 $$
-f = \operatorname{clamp}\!\left(
+f = \mathrm{clamp}\!\left(
 \frac{F_{\text{current}}}{F_{\text{effort}}},
 0.8, 1.2
 \right)
@@ -780,7 +780,7 @@ A hard training effort is not a race effort. Assuming approximately constant
 efficiency factor, speed scales with heart rate:
 
 $$
-c_{HR} = \operatorname{clamp}\!\left(
+c_{HR} = \mathrm{clamp}\!\left(
 \frac{HR_{\text{race}}}{HR_{\text{effort}}},
 1.0, 1.15
 \right)

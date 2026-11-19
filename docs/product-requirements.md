@@ -13,7 +13,7 @@
 | --- | --- |
 | **Project** | Athlete Stress Sim |
 | **Repository** | `athlete-stress-sim` |
-| **Author** | Alejandro Vallejo Mayo — Double Degree in Mathematics and Computer Engineering, University of Seville |
+| **Author** | Alejandro Vallejo Mayo — Double Degree in Mathematics and Computer Science, University of Seville |
 | **User zero** | Personal preparation for a first half marathon (3 running days + 3 gym days per week) |
 | **Device** | Polar Ignite via Polar AccessLink v3 |
 | **Horizon** | 4 months / 16 weekly sprints |
@@ -277,7 +277,7 @@ $$
 where
 
 $$
-HR_r = \operatorname{clamp}\!\left(
+HR_r = \mathrm{clamp}\!\left(
 \frac{HR - HR_{\text{rest}}}{HR_{\max} - HR_{\text{rest}}},
 0, 1
 \right)

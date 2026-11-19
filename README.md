@@ -528,7 +528,7 @@ Delivery history lives in [`docs/roadmap.md`](docs/roadmap.md); release notes li
 in [`CHANGELOG.md`](CHANGELOG.md).
 
 **Author:** Alejandro Vallejo Mayo — Double Degree in Mathematics and Computer
-Engineering, University of Seville.
+Science, University of Seville.
 
 ---
 
