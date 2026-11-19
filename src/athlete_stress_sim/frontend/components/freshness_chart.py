@@ -10,6 +10,7 @@ from athlete_stress_sim.backend.schemas.metrics import BanisterSeriesResponse
 from athlete_stress_sim.frontend.theme import COLORS, style_figure, surface_style
 
 _NO_DATA_MESSAGE = "No freshness history yet."
+_GRAPH_STYLE = {"flex": "1 1 0", "minHeight": "180px"}
 
 
 def build_freshness_figure(series: BanisterSeriesResponse) -> go.Figure:
@@ -33,7 +34,6 @@ def build_freshness_figure(series: BanisterSeriesResponse) -> go.Figure:
         figure,
         margin={"l": 36, "r": 12, "t": 12, "b": 28},
         showlegend=False,
-        height=180,
     )
     figure.update_xaxes(tickformat="%b %d", nticks=5)
     figure.update_yaxes(zeroline=False)
@@ -48,8 +48,8 @@ def freshness_panel(series: BanisterSeriesResponse) -> dmc.Paper:
             dmc.Text(_NO_DATA_MESSAGE, size="sm", style={"color": COLORS["text_muted"]}),
             dcc.Graph(
                 figure=_empty_figure(),
-                config={"displayModeBar": False},
-                style={"height": "180px"},
+                config={"displayModeBar": False, "responsive": True},
+                style=_GRAPH_STYLE,
             ),
         ]
     else:
@@ -62,16 +62,16 @@ def freshness_panel(series: BanisterSeriesResponse) -> dmc.Paper:
             ),
             dcc.Graph(
                 figure=build_freshness_figure(series),
-                config={"displayModeBar": False},
-                style={"height": "180px"},
+                config={"displayModeBar": False, "responsive": True},
+                style=_GRAPH_STYLE,
             ),
         ]
     return dmc.Paper(
-        dmc.Stack(content, gap="xs"),
+        dmc.Stack(content, gap="xs", style={"height": "100%"}),
         p="lg",
         radius="md",
         withBorder=True,
-        style=surface_style(),
+        style=surface_style(height="100%"),
     )
 
 

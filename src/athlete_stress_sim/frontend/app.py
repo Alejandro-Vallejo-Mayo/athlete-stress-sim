@@ -287,6 +287,7 @@ def _today_tab() -> dmc.Stack:
                     html.Div(
                         freshness_panel(BanisterSeriesResponse()),
                         id="freshness-panel",
+                        style={"height": "100%"},
                     ),
                     dmc.Stack(
                         [rpe_pending_card(), session_editor_card()],
