@@ -1,12 +1,12 @@
 # User Guide — Dashboard and Metric Interpretation
 
-> **Version:** 1.1.0 · **Status:** Final · **Last updated:** 2026-11-13
+> **Document version:** 1.2.0 · **Product version:** 1.0.0 · **Status:** Final · **Last updated:** 2026-11-19
 >
 > This guide explains what Athlete Stress Sim calculates, what each dashboard
 > panel represents and how to read its charts. It is written for using the
-> application, not for replacing the [PRD](product-requirements.md) or the
-> [roadmap](roadmap.md), which are the product and planning references. The full
-> derivations live in [`mathematical-model.md`](mathematical-model.md).
+> application, not for replacing the [PRD](product-requirements.md) (product
+> contract), the [roadmap](roadmap.md) (historical delivery record) or the
+> canonical [mathematical model](mathematical-model.md).
 >
 > **This is not medical advice.** The metrics are estimates of internal load and
 > fatigue. Use them to detect trends, not to diagnose injuries or replace a
@@ -71,7 +71,8 @@ FastAPI → Dash/Mantine dashboard
   trends, not the absolute value of a strength session against a run.
 - **Privacy:** all biometric data stays in the local DuckDB file. The
   application does not share training data with third parties; the only external
-  service is the Polar AccessLink API used for ingestion.
+  service is the Polar AccessLink API used for ingestion. See
+  [`SECURITY.md`](../SECURITY.md) for the deployment security model.
 
 ---
 
@@ -337,9 +338,10 @@ The **Aerobic decoupling** panel analyzes one selected run. The efficiency facto
 is:
 
 ```text
-EF_km = mean speed in m/s / mean heart rate in bpm
+EF_km = sum speed in m/s / sum heart rate in bpm
 ```
 
+With equal sample counts this is the ratio of mean speed to mean heart rate.
 Higher EF means more speed at the same heart rate. The bar chart shows EF per
 kilometer and a dotted mean reference line.
 
@@ -477,6 +479,9 @@ rate and efficiency factor, not by raw pace.
 
 ## 8. Metric definitions and formulas
 
+These are quick-reference formulas; the canonical definitions, assumptions and
+references live in [`mathematical-model.md`](mathematical-model.md).
+
 ### 8.1 Banister TRIMP (running and elliptical)
 
 $$
@@ -542,7 +547,7 @@ Freshness_t = k_1 g_t - k_2 h_t
 Performance_t = P_0 + Freshness_t
 $$
 
-Default priors: `tau_1 = 45` days, `tau_2 = 15` days, `k_1 = 1.0`,
+Default priors: `tau_1 = 42` days, `tau_2 = 7` days, `k_1 = 1.0`,
 `k_2 = 2.0`, `P_0 = 0.0`.
 
 ### 8.5 Calibration gate
@@ -575,7 +580,7 @@ $$
 ### 8.7 Efficiency factor and decoupling
 
 $$
-EF_k = \frac{\overline{v}_k}{\overline{HR}_k}
+EF_k = \frac{\sum_{i \in k} v_i}{\sum_{i \in k} HR_i}
 $$
 
 $$
@@ -584,7 +589,8 @@ $$
 {\overline{EF}_{\text{first}}} \times 100
 $$
 
-`v` is speed in meters per second and `HR` is heart rate in bpm.
+`v` is speed in meters per second and `HR` is heart rate in bpm. With equal
+sample counts, `EF_k` is the ratio of mean speed to mean heart rate.
 
 ### 8.8 Race prediction
 
@@ -610,8 +616,8 @@ short races, 90 % for 10K, 88 % for the half marathon and 85 % for the marathon.
 ## 9. Configuration reference
 
 Configuration uses environment variables with the `POLAR_` and `ATHLETE_`
-prefixes. Copy `.env.example` to `.env`; `.env` is git-ignored and must never be
-committed.
+prefixes, plus `API_URL` and `DASH_DEBUG` for the frontend. Copy `.env.example`
+to `.env`; `.env` is git-ignored and must never be committed.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -625,18 +631,21 @@ committed.
 | `POLAR_MEMBER_ID` | `athlete-stress-sim` | Partner member id used to register the user |
 | `POLAR_SYNC_ON_STARTUP` | `true` | Run a catch-up sync when the backend starts |
 | `ATHLETE_HR_MAX` | `200` | Maximum heart rate (bpm) |
-| `ATHLETE_HR_REST` | `55` | Resting heart rate (bpm) |
-| `ATHLETE_TAU_1` | `45.0` | Fitness time constant (days) |
-| `ATHLETE_TAU_2` | `15.0` | Fatigue time constant (days) |
+| `ATHLETE_HR_REST` | `60` | Resting heart rate (bpm) |
+| `ATHLETE_TAU_1` | `42.0` | Fitness time constant (days) |
+| `ATHLETE_TAU_2` | `7.0` | Fatigue time constant (days) |
 | `ATHLETE_K_1` | `1.0` | Fitness gain |
 | `ATHLETE_K_2` | `2.0` | Fatigue gain |
 | `ATHLETE_P0` | `0.0` | Baseline performance |
 | `ATHLETE_SEX` | `male` | Selects the Banister TRIMP coefficients |
 | `ATHLETE_DB_PATH` | `data/athleta.duckdb` | Local DuckDB database path |
 | `ATHLETE_RAW_DATA_DIR` | `data/raw` | Directory for raw Polar files |
+| `API_URL` | `http://localhost:8000` | Backend base URL used by the dashboard (Compose sets `http://backend:8000`) |
+| `DASH_DEBUG` | `true` | Enable Dash debug mode; set `false` in containerized deployments |
 
-> `.env.example` contains the user-zero reference values, which may differ from
-> the code defaults. Use the values that match your own physiology.
+> `.env.example` contains the user-zero reference values and matches the code
+> defaults (`HR_max=200`, `HR_rest=60`, `tau_1=42`, `tau_2=7`). Adjust them to
+> your own physiology.
 
 ---
 

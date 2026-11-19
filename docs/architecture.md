@@ -1,6 +1,6 @@
 # Architecture — Athlete Stress Sim
 
-> **Version:** 1.1.0 · **Status:** Final · **Last updated:** 2026-11-13
+> **Document version:** 1.2.0 · **Product version:** 1.0.0 · **Status:** Final · **Last updated:** 2026-11-19
 >
 > **Audience:** maintainers, reviewers and anyone evaluating the engineering
 > design of the project. This document describes the as-built architecture of
@@ -543,7 +543,8 @@ The S15 optimization work introduced batch reads, the `SampleRow` type, the
 reported in [`validation.md`](validation.md):
 
 - warm dashboard load: from ~5.5 s to ~0.32 s;
-- metric endpoints: below 200 ms;
+- warm metric endpoints: below 200 ms; the first cold request includes the
+  snapshot load and can exceed this target;
 - ODE simulation: below the 0.5 s requirement.
 
 These are local single-user measurements, not a load test. They are sufficient
@@ -662,7 +663,7 @@ a `.env` file in the current working directory.
 | `POLAR_AUTHORIZE_URL`, `POLAR_TOKEN_URL`, `POLAR_API_URL`, `POLAR_SCOPE` | `PolarConfig` | OAuth2 and AccessLink endpoints |
 | `POLAR_MEMBER_ID` | `PolarConfig` | Partner member id used during user registration |
 | `POLAR_SYNC_ON_STARTUP` | `PolarConfig` | Enables the lifespan catch-up sync |
-| `ATHLETE_HR_MAX`, `ATHLETE_HR_REST`, `ATHLETE_SEX` | `PhysiologicalConfig` | TRIMP priors and coefficients |
+| `ATHLETE_HR_MAX`, `ATHLETE_HR_REST`, `ATHLETE_SEX` | `PhysiologicalConfig` | TRIMP defaults and coefficients |
 | `ATHLETE_TAU_1`, `ATHLETE_TAU_2`, `ATHLETE_K_1`, `ATHLETE_K_2`, `ATHLETE_P0` | `PhysiologicalConfig` | Banister priors |
 | `ATHLETE_DB_PATH` | `StorageConfig` | DuckDB file path |
 | `ATHLETE_RAW_DATA_DIR` | `StorageConfig` | Raw FIT directory |
@@ -672,6 +673,9 @@ a `.env` file in the current working directory.
 `.env` is git-ignored. `.env.example` documents the variables and contains no
 real credentials. The Compose backend service reads `.env` when present, and the
 frontend receives `API_URL=backend:8000`.
+
+The user-zero reference values in `.env.example` match the code defaults:
+`HR_max=200`, `HR_rest=60`, `tau_1=42` and `tau_2=7`.
 
 ---
 
@@ -792,9 +796,9 @@ permissions.
 
 ### 15.4 Release state
 
-The `v1.0.0` tag is part of S16 and is created after the documentation,
-screenshot and secret-review checklist is complete. The public README and
-technical deep dives are released together with that tag.
+The `v1.0.0` documentation, screenshot and secret-review checklist is complete.
+The tag is created after the final push and CI confirmation. The public README
+and technical deep dives are released together with that tag.
 
 ---
 
@@ -867,8 +871,6 @@ Known test-boundary details:
 - **No structured observability.** Logs and `ingest_log` exist, but there are no
   metrics, traces or correlation ids.
 - **No webhook ingestion.** Polar's 30-day listing is the only discovery path.
-- **Unused dependency audit pending.** `statsmodels` is declared in
-  `pyproject.toml` but is not imported by the current source tree.
 - **Calibration may stay on priors.** With short or noisy histories the gate
   fails by design; the dashboard then shows prior-shaped curves.
 
@@ -898,6 +900,10 @@ Known test-boundary details:
 - [`mathematical-model.md`](mathematical-model.md) — derivations, calibration objective and references.
 - [`validation.md`](validation.md) — real-data validation, calibration diagnostics and performance.
 - [`README.md`](../README.md) — public overview and quick start.
+- [`CONTRIBUTING.md`](../CONTRIBUTING.md) — development workflow and contribution guidelines.
+- [`SECURITY.md`](../SECURITY.md) — security model, reporting and privacy expectations.
+- [`CHANGELOG.md`](../CHANGELOG.md) — release history.
+- [`LICENSE`](../LICENSE) — MIT license.
 
 > The code remains the source of truth for exact signatures and constants. This
 > document is the architectural map; the mathematical model document owns the

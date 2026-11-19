@@ -1,10 +1,11 @@
 # Athlete Stress Sim
 
-<h3 align="center">Local-first training-load, fitness-fatigue and race-readiness platform</h3>
-
 <div align="center">
 
+<h3>Local-first training-load, fitness-fatigue and race-readiness platform</h3>
+
 [![CI](https://github.com/Alejandro-Vallejo-Mayo/athlete-stress-sim/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Alejandro-Vallejo-Mayo/athlete-stress-sim/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/badge/release-v1.0.0-2ea44f?style=flat-square)](CHANGELOG.md)
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![uv](https://img.shields.io/badge/managed_with-uv-DE5FE1?style=flat-square)](https://docs.astral.sh/uv/)
 [![DuckDB](https://img.shields.io/badge/DuckDB-OLAP-FFF000?style=flat-square)](https://duckdb.org/)
@@ -12,22 +13,25 @@
 [![Dash](https://img.shields.io/badge/Dash-Plotly-3F4F75?style=flat-square&logo=plotly&logoColor=white)](https://dash.plotly.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](https://opensource.org/licenses/MIT)
 
-<br />
-
-<img src="docs/assets/dashboard-today.png" alt="Athlete Stress Sim Today dashboard with readiness, ACWR and freshness" width="100%" />
+<img src="docs/assets/hero-banner.svg" alt="Athlete Stress Sim — training load, fitness-fatigue and race readiness" width="100%" />
 
 </div>
 
-Athlete Stress Sim turns **Polar Ignite** telemetry into a daily internal-load
-series and uses it to estimate **fitness, fatigue, overload risk and race
-readiness**. It combines heart-rate TRIMP for running and elliptical sessions with
-session-RPE for strength work, fits a Banister fitness-fatigue model, and exposes
-the results through a FastAPI backend and a dark Dash/Mantine dashboard.
+**The problem.** Weekly kilometers and total training minutes do not capture the
+physiological cost of a session or the fatigue accumulated across running and
+strength work. That makes a simple question surprisingly hard: should next week
+progress, hold or taper?
 
-The project was built as a personal tool for a first half marathon with a hybrid
-routine of **three running days and three gym days per week**. It is also a
-portfolio project about building an end-to-end, reproducible and honest
-data/physiology pipeline.
+Athlete Stress Sim was built to answer that question for my **first half
+marathon**, with a hybrid routine of **three running days and three gym days per
+week**. It turns **Polar Ignite** telemetry into a daily internal-load series and
+uses it to estimate **fitness, fatigue, overload risk and race readiness**. It
+combines heart-rate TRIMP for running and elliptical sessions with session-RPE for
+strength work, fits a Banister fitness-fatigue model, and exposes the results
+through a FastAPI backend and a dark Dash/Mantine dashboard.
+
+It is also a portfolio project about building an end-to-end, reproducible and
+honest data/physiology pipeline.
 
 > **This is not medical advice.** The metrics are monitoring and planning aids,
 > not diagnoses. They do not replace professional assessment.
@@ -36,24 +40,40 @@ data/physiology pipeline.
 
 ## Contents
 
-- [What it does](#what-it-does)
-- [Why this exists](#why-this-exists)
-- [Feature highlights](#feature-highlights)
-- [Architecture](#architecture)
-- [Mathematical core](#mathematical-core)
-- [Dashboard tour](#dashboard-tour)
-- [Quick start](#quick-start)
-- [Usage](#usage)
-- [Engineering highlights](#engineering-highlights)
-- [Validation and results](#validation-and-results)
-- [Testing and quality](#testing-and-quality)
-- [Project structure](#project-structure)
-- [Documentation](#documentation)
-- [Contributing](#contributing)
-- [Security and privacy](#security-and-privacy)
-- [Limitations and scope](#limitations-and-scope)
-- [Status](#status)
-- [License](#license)
+- [Athlete Stress Sim](#athlete-stress-sim)
+  - [Contents](#contents)
+  - [What it does](#what-it-does)
+  - [Why this exists](#why-this-exists)
+  - [Feature highlights](#feature-highlights)
+  - [Architecture](#architecture)
+    - [Tech stack](#tech-stack)
+  - [Mathematical core](#mathematical-core)
+  - [Dashboard tour](#dashboard-tour)
+    - [Today](#today)
+    - [Trends — Training load](#trends--training-load)
+    - [Trends — Aerobic decoupling](#trends--aerobic-decoupling)
+    - [Plan — Race taper](#plan--race-taper)
+    - [Plan — What-if simulator](#plan--what-if-simulator)
+    - [Plan — Race predictor](#plan--race-predictor)
+  - [Quick start](#quick-start)
+    - [Prerequisites](#prerequisites)
+    - [1. Install](#1-install)
+    - [2. Configure Polar](#2-configure-polar)
+    - [3. Run locally](#3-run-locally)
+    - [Docker](#docker)
+    - [Useful commands](#useful-commands)
+  - [Usage](#usage)
+  - [Engineering highlights](#engineering-highlights)
+  - [Validation and results](#validation-and-results)
+  - [Testing and quality](#testing-and-quality)
+    - [Data availability](#data-availability)
+  - [Project structure](#project-structure)
+  - [Documentation](#documentation)
+  - [Contributing](#contributing)
+  - [Security and privacy](#security-and-privacy)
+  - [Limitations and scope](#limitations-and-scope)
+  - [Status](#status)
+  - [License](#license)
 
 ---
 
@@ -79,16 +99,16 @@ data/physiology pipeline.
 
 ## Why this exists
 
-Weekly kilometers or total training minutes are easy to count, but they do not
-capture the physiological cost of a session or the accumulation of fatigue across
-weeks. A hard gym block, a long run and an easy elliptical session can look
-similar in duration while producing very different internal load.
+Most training logs answer **what did I do?** but not **what did it cost?** A hard
+gym block, a long run and an easy elliptical session can look similar in duration
+while producing very different internal load, and the fatigue they leave behind
+accumulates across both running and strength work.
 
-The project started from a concrete problem: preparing for a first half marathon
-while lifting three times per week, with no clear way to decide whether the next
-week should progress, hold or taper. The system answers that question with a
-transparent model, a local database and a dashboard that shows both the current
-state and the uncertainty behind it.
+The project therefore favors:
+
+- a transparent physiological model over a black-box score;
+- local ownership of biometric data;
+- explicit uncertainty and a safe fallback when calibration is not trustworthy.
 
 ---
 
@@ -208,8 +228,10 @@ I get here?**, and **what should I do next?**
 
 ### Today
 
-The hero capture above shows the **Today** view: readiness, freshness, ACWR,
+The **Today** view answers "how am I today?": readiness, freshness, ACWR,
 at-a-glance stats, gym-RPE status and session-data correction.
+
+<img src="docs/assets/dashboard-today.png" alt="Today dashboard with readiness, freshness, ACWR and session data" width="100%" />
 
 ### Trends — Training load
 
@@ -244,9 +266,6 @@ Estimate race potential from detected best efforts, with model, confidence and
 support range.
 
 <img src="docs/assets/dashboard-race-predictor.png" alt="Race predictor panel with predicted time, pace, range and confidence" width="100%" />
-
-> Capture guidelines and exact file names live in
-> [`docs/assets/README.md`](docs/assets/README.md).
 
 ---
 
@@ -447,7 +466,6 @@ athlete-stress-sim/
 | [`docs/architecture.md`](docs/architecture.md) | Runtime topology, components, data model, flows and technical debt |
 | [`docs/mathematical-model.md`](docs/mathematical-model.md) | Canonical equations, calibration, assumptions and scientific references |
 | [`docs/validation.md`](docs/validation.md) | Real-data snapshot, calibration diagnostics, performance and validity |
-| [`docs/assets/README.md`](docs/assets/README.md) | Dashboard capture names and guidelines |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Development workflow, quality gates and contribution guidelines |
 | [`SECURITY.md`](SECURITY.md) | Security model, deployment assumptions and private reporting |
 | [`CHANGELOG.md`](CHANGELOG.md) | Release history and notable changes |
@@ -503,10 +521,11 @@ expose ports `8000` or `8050` to the internet.
 
 ## Status
 
-**v1.0.0 — final release.** The implementation, English documentation, validation
-report and dashboard captures are complete. Delivery history lives in
-[`docs/roadmap.md`](docs/roadmap.md); release notes live in
-[`CHANGELOG.md`](CHANGELOG.md).
+**v1.0.0 — release documentation complete.** The implementation, English
+documentation, validation report, dashboard captures and release files are
+complete. The `v1.0.0` tag is created after the final push and CI confirmation.
+Delivery history lives in [`docs/roadmap.md`](docs/roadmap.md); release notes live
+in [`CHANGELOG.md`](CHANGELOG.md).
 
 **Author:** Alejandro Vallejo Mayo — Double Degree in Mathematics and Computer
 Engineering, University of Seville.

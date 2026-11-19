@@ -1,6 +1,6 @@
 # Mathematical Model — Athlete Stress Sim
 
-> **Version:** 1.1.0 · **Status:** Final · **Last updated:** 2026-11-13
+> **Document version:** 1.2.0 · **Product version:** 1.0.0 · **Status:** Final · **Last updated:** 2026-11-19
 >
 > **Audience:** reviewers and maintainers with a background in calculus, ordinary
 > differential equations, linear algebra and applied statistics. This document
@@ -58,9 +58,11 @@ running telemetry ──► efficiency factor ──► calibration ──► in
 
 The document covers the production path. The historical Extended Kalman Filter
 (EKF) is mentioned only where it explains why the final calibration is different;
-it is not part of the active model. The code remains the authoritative source for
-constants and edge cases; [Section 12](#12-implementation-map) maps every
-mathematical object to its module.
+it is not part of the active model. This document is the canonical source for the
+model equations, assumptions and references; the README, PRD and user guide
+summarize it. The code remains the authoritative source for constants and edge
+cases; [Section 12](#12-implementation-map) maps every mathematical object to its
+module.
 
 ---
 
@@ -167,8 +169,9 @@ $$
 
 where `Δt_min` is the sample interval in minutes (one second by default).
 Samples that are missing or non-positive contribute no load. This discrete
-integral is the primary implementation; the average-heart-rate form is retained
-as a convenience for sessions without a usable sample stream.
+integral is the production implementation. The average-heart-rate form remains
+available as the `trimp_from_average` helper, but the session load path does not
+fall back to it: a session without usable heart-rate samples contributes no load.
 
 **Why this matters.** The exponential term makes high-intensity minutes
 disproportionately expensive. Two sessions with the same duration can therefore
@@ -254,8 +257,8 @@ $$
 
 The physiological intuition is:
 
-- `τ_1` is long (default `45` days), so fitness accumulates and decays slowly.
-- `τ_2` is short (default `15` days), so fatigue accumulates and decays quickly.
+- `τ_1` is long (default `42` days), so fitness accumulates and decays slowly.
+- `τ_2` is short (default `7` days), so fatigue accumulates and decays quickly.
 - `k_1` and `k_2` set the relative contribution of each component.
 - `P_0` is the baseline performance level in arbitrary units.
 
@@ -328,34 +331,34 @@ not the production sequence.
 
 ### 4.5 Worked example
 
-Take `HR = 150` bpm, `HR_rest = 55` bpm and `HR_max = 200` bpm. Then
+Take `HR = 150` bpm, `HR_rest = 60` bpm and `HR_max = 200` bpm. Then
 
 $$
-HR_r = \frac{150-55}{200-55} \approx 0.655
+HR_r = \frac{150-60}{200-60} \approx 0.643
 $$
 
 For a male athlete,
 
 $$
-y = 0.64e^{1.92 \times 0.655} \approx 2.252
+y = 0.64e^{1.92 \times 0.643} \approx 2.199
 $$
 
 and a 60-minute session at that average heart rate yields
 
 $$
-TRIMP \approx 60 \times 0.655 \times 2.252 \approx 88.5 \text{ AU}
+TRIMP \approx 60 \times 0.643 \times 2.199 \approx 84.8 \text{ AU}
 $$
 
 Now apply a single 100 AU impulse with the default parameters
-(`τ_1 = 45`, `τ_2 = 15`, `k_1 = 1`, `k_2 = 2`). The first days are:
+(`τ_1 = 42`, `τ_2 = 7`, `k_1 = 1`, `k_2 = 2`). The first days are:
 
 | Day | Fitness `g` | Fatigue `h` | Freshness `F` |
 | --- | ---: | ---: | ---: |
 | 1 | 100.00 | 100.00 | −100.00 |
-| 2 | 97.80 | 93.55 | −89.30 |
-| 3 | 95.65 | 87.52 | −79.38 |
-| 4 | 93.55 | 81.87 | −70.20 |
-| 5 | 91.49 | 76.59 | −61.69 |
+| 2 | 97.65 | 86.69 | −75.73 |
+| 3 | 95.35 | 75.15 | −54.95 |
+| 4 | 93.11 | 65.14 | −37.18 |
+| 5 | 90.92 | 56.47 | −22.03 |
 
 Fatigue decays faster than fitness, which is exactly the behavior a taper
 exploits: reduce load, let fatigue fall, and preserve a larger fraction of

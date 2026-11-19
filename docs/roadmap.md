@@ -1,14 +1,16 @@
 # Master Roadmap — Athlete Stress Sim
 
-> **Development control document.** Every implementation task must trace back to
-> one of the weeks and acceptance criteria defined here.
+> **Historical delivery record.** This document is frozen after the `v1.0.0`
+> release. Every implementation task traces back to one of the weeks and
+> acceptance criteria defined here.
 >
-> - **Project:** Biomechanical Fatigue & Load Management Optimizer
+> - **Project:** Athlete Stress Sim
 > - **Horizon:** 4 months (16 weeks) · 1 semester
 > - **User zero:** personal preparation for a first half marathon (3 running days + 3 gym days)
 > - **Device:** Polar Ignite (Polar AccessLink API)
-> - **Requirement source:** [`product-requirements.md`](product-requirements.md) (v1.1.0)
-> - **Status:** S1–S15 delivered · S16 in progress
+> - **Requirement source:** [`product-requirements.md`](product-requirements.md) (v1.2.0)
+> - **Status:** S1–S16 delivered · `v1.0.0` complete (tag pending final push)
+> - **Last updated:** 2026-11-19
 
 ---
 
@@ -107,16 +109,16 @@ good form.
 | **F0** | 1 | S1–S4 | Foundations, Polar and DuckDB | Raw telemetry persisted | Done |
 | **F1** | 2 | S5–S9 | Physiological engine | TRIMP, ACWR, ODE and calibration functional | Done |
 | **F2** | 3 | S10–S13 | API + dashboard | Interactive dashboard and simulator | Done |
-| **F3** | 4 | S14–S16 | Real use, validation and portfolio | Validated system + public documentation | In progress |
+| **F3** | 4 | S14–S16 | Real use, validation and portfolio | Validated system + public documentation | Done (tag pending) |
 
 ### 4.1 Status summary
 
-- **S1–S15:** delivered. S14 keeps one non-blocking maintenance item (minor
-  bug fixes from real use); no blocking defects were found.
-- **S16:** in progress (public README, dashboard captures, secret review,
-  license/changelog and release tag).
-- **Release:** `v1.0.0` is pending until the documentation and release checklist
-  are closed.
+- **S1–S16:** delivered. The S14 maintenance item is closed; no blocking defects
+  were found.
+- **S16:** documentation complete, including the public README, dashboard
+  captures, secret review, license, changelog, contribution and security files.
+- **Release:** `v1.0.0` documentation is complete. The release tag is created
+  after the final push and CI confirmation.
 
 ---
 
@@ -352,8 +354,9 @@ NLS with fixed `tau` + ridge and a CV gate; kept as a historical reference.*
   filter in `/exercises`.
 - [x] Validate calibration against real observations. After the identifiability
   study, production uses NLS with fixed `tau` + ridge and a cross-validation gate
-  (`GET /metrics/calibration`, deprecated alias `/metrics/ekf`); with 13 real
-  observations the gate is not passed and the system falls back to priors.
+  (`GET /metrics/calibration`, deprecated alias `/metrics/ekf`); with 13
+  observations at S14 close and 16 in the final snapshot, the gate is not passed
+  and the system falls back to priors.
 - [x] Tune the taper for the weeks before the half marathon. Implemented
   `POST /simulate/taper/plan` + the `Race taper` panel (factors 0.75/0.55/0.35,
   4-week baseline); validated with real data, maximum freshness falls on
@@ -361,7 +364,7 @@ NLS with fixed `tau` + ridge and a CV gate; kept as a historical reference.*
 - [x] Race-time prediction (`RF-05.4`). Implemented `GET /metrics/best-efforts`
   and `POST /metrics/race-prediction` + the `Race predictor` panel with Riegel,
   critical speed, `%HRR`, EF, fitness adjustment, range and confidence.
-- [ ] Fix bugs found during real use. No blocking defects were found; minor
+- [x] Fix bugs found during real use. No blocking defects were found; minor
   frontend fixes landed and remaining polish is tracked as maintenance.
 
 #### Week 15 — Optimization, Docker and CI/CD
@@ -371,7 +374,8 @@ NLS with fixed `tau` + ridge and a CV gate; kept as a historical reference.*
 - [x] Optimize DuckDB queries and simulation times. Batch reads
   (`list_exercises_with_rpe` + `query_all_samples`), lightweight `SampleRow`
   rows, an index on `samples(exercise_id)` and a database-revision cache:
-  dashboard from 5.5 s to ~0.32 s warm, metric endpoints < 200 ms.
+  dashboard from 5.5 s to ~0.32 s warm, warm metric endpoints < 200 ms; the
+  first cold request includes the snapshot load and can exceed that target.
 - [x] Finalize Docker packaging and cold-start `docker compose up`. Runtime-only
   images with no data or secrets; `build --no-cache`, start with a real database
   and with an empty database verified.
@@ -383,19 +387,20 @@ NLS with fixed `tau` + ridge and a CV gate; kept as a historical reference.*
 
 **Objective:** close the project in a presentable state.
 
-- [~] Public `README.md` in English with:
+- [x] Public `README.md` in English with:
   - [x] Mathematical explanation (LaTeX equations).
   - [x] Architecture diagram.
-  - [ ] Real dashboard captures.
+  - [x] Real dashboard captures.
 - [x] Translate the PRD to English and update it to the as-built state.
 - [x] Translate the roadmap to English and update it to the as-built state.
 - [x] Translate and update the user guide to English.
 - [x] Write `architecture.md` — system design, data flows and technical debt.
 - [x] Write `mathematical-model.md` — load, Banister, calibration, ACWR and prediction.
 - [x] Write `validation.md` — real-data snapshot, calibration, latency and quality gates.
-- [ ] Review exposed credentials and clean up secrets.
-- [ ] Add `LICENSE` (MIT) and `CHANGELOG.md`.
-- [ ] Tag the `v1.0.0` release.
+- [x] Review exposed credentials and clean up secrets. No tracked `.env`, `.fit`,
+  `.duckdb`, `.pem` or `.key` files and no real credentials in versioned content.
+- [x] Add `LICENSE` (MIT), `CHANGELOG.md`, `CONTRIBUTING.md` and `SECURITY.md`.
+- [~] Tag the `v1.0.0` release. Pending the final push and CI confirmation.
 
 ---
 
@@ -427,7 +432,7 @@ NLS with fixed `tau` + ridge and a CV gate; kept as a historical reference.*
 - [x] System validated with ≥ 2 weeks of real data.
 - [x] Green CI/CD and reproducible Docker deployment. Docker verified cold; CI
   validated locally with `make test-cov` (GitHub run pending after the push).
-- [~] Complete public documentation (English, LaTeX, diagrams, captures).
+- [x] Complete public documentation (English, LaTeX, diagrams, captures).
 
 ---
 
@@ -494,3 +499,6 @@ NLS with fixed `tau` + ridge and a CV gate; kept as a historical reference.*
 
 > **Golden rule:** if a task does not appear in this document, it is either out
 > of scope or must be added explicitly before implementation.
+
+> This roadmap is frozen as the delivery record for `v1.0.0`. Future work should
+> be tracked in a new roadmap or in the repository issue tracker.

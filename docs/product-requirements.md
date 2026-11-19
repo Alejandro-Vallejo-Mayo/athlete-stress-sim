@@ -1,13 +1,13 @@
 # Product Requirements Document (PRD)
 
-## Athlete Stress Sim — Biomechanical Fatigue & Load Management Optimizer
+## Athlete Stress Sim — Local-first training-load, fitness-fatigue and race-readiness platform
 
-> **Version:** 1.1.0 · **Status:** As-built / final · **Last updated:** 2026-11-13
+> **Document version:** 1.2.0 · **Product version:** 1.0.0 · **Status:** Final / as-built · **Last updated:** 2026-11-19
 >
 > This document describes the final `v1.0.0` implementation. Where the original
 > plan and the delivered system differ, the as-built behavior is normative.
-> Historical decisions are noted explicitly so requirement traceability is
-> preserved.
+> Historical decisions and sprint tags are retained for traceability; the
+> [`roadmap.md`](roadmap.md) is the delivery record.
 
 | Field | Value |
 | --- | --- |
@@ -20,6 +20,8 @@
 | **Requirement source** | This document |
 | **Planning source** | [`roadmap.md`](roadmap.md) |
 | **User documentation** | [`user-guide.md`](user-guide.md) |
+| **Public overview** | [`README.md`](../README.md) |
+| **Release notes** | [`CHANGELOG.md`](../CHANGELOG.md) |
 
 ---
 
@@ -45,7 +47,9 @@
 This PRD is the product-level contract for Athlete Stress Sim. It defines
 **what** the system does, **why** it exists and **how each requirement is
 formulated**. The [`roadmap.md`](roadmap.md) defines **when** and **in what
-order** the work was delivered.
+order** the work was delivered. Equations in this document define the required
+behavior; the canonical derivations, assumptions and references live in
+[`mathematical-model.md`](mathematical-model.md).
 
 Requirement identifiers (`RF-xx`, `RNF-xx`) and sprint tags (`S1`–`S16`) are
 stable. Three requirements were added during implementation:
@@ -64,12 +68,12 @@ cross-validation gate. The EKF remains documented as a historical milestone.
 
 ### 2.1 Context and motivation
 
-In endurance and hybrid training (running plus strength work), the main cause of
-stagnation and overuse injuries — plantar fasciitis, shin splints, tendinopathy —
-is the imbalance between **training load** and **neuromuscular recovery
-capacity**. Conventional metrics such as weekly kilometers or total minutes
-ignore the individual physiological response and the accumulation of fatigue
-over several weeks.
+In endurance and hybrid training (running plus strength work), a major contributor
+to stagnation and overuse complaints — plantar fasciitis, shin splints,
+tendinopathy — is the mismatch between **training load** and **neuromuscular
+recovery capacity**. Conventional metrics such as weekly kilometers or total
+minutes can obscure the individual physiological response and the accumulation
+of fatigue over several weeks.
 
 Athlete Stress Sim addresses that gap with a local, reproducible pipeline that
 turns raw Polar telemetry into a daily load series and uses it to estimate
@@ -95,9 +99,9 @@ that:
 
 The first user is the author: a student preparing for a first half marathon with
 a hybrid weekly routine of three running sessions and three strength sessions.
-The system was used with real Polar data for more than two weeks before the
-`v1.0.0` release. The validation window is documented in `validation.md` as part
-of the S16 public documentation set.
+The system was used with real Polar data for a 41-day validation window
+(2026-10-03 → 2026-11-12) before the `v1.0.0` release. The aggregate snapshot and
+diagnostics are documented in [`validation.md`](validation.md).
 
 ### 2.4 Scope and non-goals
 
@@ -156,7 +160,7 @@ training data to third parties (`RNF-01`).
 | Numerical engine | NumPy + SciPy | ODE integration and bounded least squares |
 | API | FastAPI + Uvicorn | REST endpoints and OpenAPI docs |
 | Dashboard | Plotly Dash + Dash Mantine Components | Dark, information-dense UI |
-| Validation | Pydantic v2 + pydantic-settings | Schemas and environment configuration |
+| Contracts/config | Pydantic v2 + pydantic-settings | Schemas and environment configuration |
 | Testing | pytest + pytest-cov | Unit, integration and coverage gates |
 | Quality | ruff + mypy + pre-commit | Lint, format and static typing |
 | Delivery | Docker Compose + GitHub Actions | Reproducible deployment and CI |
@@ -231,8 +235,9 @@ Ingest second-by-second series from FIT files:
 - altitude;
 - cumulative distance.
 
-The parser normalizes units, filters invalid samples and tolerates gaps. TCX is
-not required because the Polar Ignite emits FIT.
+The parser normalizes units, flags out-of-range samples as invalid, nulls the
+invalid values and keeps the rows so gaps remain visible. TCX is not required
+because the Polar Ignite emits FIT.
 
 #### RF-01.4 — Strength training and session-RPE
 
@@ -370,10 +375,12 @@ $$
 means the athlete is prepared; negative freshness immediately after a hard
 session is expected because fatigue rises faster than fitness.
 
-Reference priors:
+Reference defaults and priors:
 
-- `tau_1 = 45` days (fitness);
-- `tau_2 = 15` days (fatigue);
+- `HR_max = 200` bpm;
+- `HR_rest = 60` bpm;
+- `tau_1 = 42` days (fitness);
+- `tau_2 = 7` days (fatigue);
 - `k_1 = 1.0`;
 - `k_2 = 2.0`;
 - `P_0 = 0.0`.
@@ -536,10 +543,11 @@ $$
 For a selected run, compute the efficiency factor per kilometer:
 
 $$
-EF_k = \frac{\overline{v}_k}{\overline{HR}_k}
+EF_k = \frac{\sum_{i \in k} v_i}{\sum_{i \in k} HR_i}
 $$
 
-where `v` is speed in meters per second and `HR` is heart rate in bpm. Higher
+where `v` is speed in meters per second and `HR` is heart rate in bpm. With
+equal sample counts this is the ratio of mean speed to mean heart rate. Higher
 EF means more speed at the same heart rate.
 
 Compare the two halves of the run:
@@ -571,7 +579,7 @@ slow:
 | `moderate` | `70 – 80 %` | Low-confidence reference only |
 | `easy` | `< 70 %` | Not used as race pace; fitness/EF trend only |
 
-Two models are supported:
+Two distance-time models are supported, with a heart-rate extrapolation fallback:
 
 **Riegel power law**
 
@@ -610,14 +618,15 @@ confidence, the efforts used and explanatory notes.
 All biometric data is stored in a local DuckDB file and is never shared with
 third parties. Raw FIT files, the DuckDB database and real biometric captures
 must not be committed to the repository. Dashboard screenshots published in the
-documentation must be reviewed and sanitized before release.
+documentation are reviewed and sanitized; unsanitized captures are not committed.
 
 ### RNF-02 — Simulator performance
 
 ODE simulations and numerical integration must run in **less than 0.5 seconds**.
-The delivered implementation also targets a warm dashboard load of roughly
-0.3 seconds and metric endpoints below 200 ms through batch reads and a cached
-session snapshot.
+Additional performance targets in the delivered implementation are a warm
+dashboard load of roughly 0.3 seconds and warm metric endpoints below 200 ms,
+achieved through batch reads and a cached session snapshot. The first cold request
+includes the initial snapshot load and can exceed the warm target.
 
 ### RNF-03 — Containerized deployment
 
@@ -634,7 +643,11 @@ aesthetic. Layouts are responsive and remain readable on laptop screens.
 
 ## 6. Requirement status summary
 
-Status reflects the final `v1.0.0` implementation.
+Status reflects the final `v1.0.0` implementation. All functional and
+non-functional requirements are implemented. The automated suite covers the core,
+API and frontend behavior; deployment and real-data behavior are validated
+separately. The calibration gate may still fall back to the priors on short or
+noisy histories.
 
 | ID | Requirement | Priority | Status | Notes |
 | --- | --- | --- | --- | --- |
@@ -704,6 +717,10 @@ athlete-stress-sim/
 ├── tests/
 ├── .env.example
 ├── .python-version
+├── LICENSE
+├── CHANGELOG.md
+├── CONTRIBUTING.md
+├── SECURITY.md
 ├── Makefile
 ├── pyproject.toml
 ├── uv.lock
@@ -719,7 +736,7 @@ athlete-stress-sim/
 | 1 | S1–S4 | Environment, OAuth2, AccessLink sync, FIT parser and DuckDB persistence | Done |
 | 2 | S5–S9 | TRIMP, session-RPE, ACWR, Banister ODE and initial EKF calibration | Done (EKF superseded in S14) |
 | 3 | S10–S13 | FastAPI metrics, dashboard, simulator and decoupling | Done |
-| 4 | S14–S16 | Real-data validation, NLS calibration, optimization, Docker/CI and documentation | S14–S15 done; S16 is the public documentation release |
+| 4 | S14–S16 | Real-data validation, NLS calibration, optimization, Docker/CI and documentation | Done |
 
 Detailed sprint acceptance criteria and risks live in [`roadmap.md`](roadmap.md).
 
@@ -741,6 +758,8 @@ The project is considered complete when:
 7. The calibration behavior is reported honestly: with the available real-data
    window, the quality gate may not be passed and the system falls back to the
    physiological priors.
+8. The repository includes the MIT `LICENSE`, a `CHANGELOG.md`, contribution
+   guidance (`CONTRIBUTING.md`) and a security policy (`SECURITY.md`).
 
 ---
 
@@ -798,6 +817,10 @@ The project is considered complete when:
 - [`mathematical-model.md`](mathematical-model.md) — derivations, calibration and references.
 - [`validation.md`](validation.md) — real-data validation, calibration diagnostics and performance.
 - [`README.md`](../README.md) — public project overview and quick start.
+- [`CONTRIBUTING.md`](../CONTRIBUTING.md) — development workflow and contribution guidelines.
+- [`SECURITY.md`](../SECURITY.md) — security model, reporting and privacy expectations.
+- [`CHANGELOG.md`](../CHANGELOG.md) — release history.
+- [`LICENSE`](../LICENSE) — MIT license.
 
-> The S16 technical deep dives live under `docs/` and are linked from the public
+> The technical deep dives live under `docs/` and are linked from the public
 > README.

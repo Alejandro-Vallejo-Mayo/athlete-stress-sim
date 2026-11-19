@@ -1,6 +1,6 @@
 # Validation Report — Athlete Stress Sim
 
-> **Version:** 1.1.0 · **Status:** Final · **Last updated:** 2026-11-13
+> **Document version:** 1.2.0 · **Product version:** 1.0.0 · **Status:** Final · **Last updated:** 2026-11-19
 >
 > **Scope:** technical and real-data validation of the `v1.0.0` implementation.
 > This report covers ingestion, storage, metric computation, calibration, API
@@ -417,7 +417,7 @@ make test-cov
 ```
 
 The local equivalent passed. The remote GitHub run should be confirmed after the
-next push; this report does not claim a remote run that has not been observed.
+release push; this report does not claim a remote run that has not been observed.
 
 ---
 
@@ -541,16 +541,21 @@ observations, the calibration improves cross-validated RMSE but does not explain
 enough in-sample variance, so the system does **not** pretend to be calibrated.
 This is the intended behavior for a personal tool built on limited, noisy data.
 
-The remaining work for `v1.0.0` is release packaging: dashboard captures, final
-secret review, license/changelog and the release tag.
+The release documentation, dashboard captures, secret review and
+license/changelog are complete. The only remaining step is the `v1.0.0` tag after
+the final push and CI confirmation.
 
 ---
 
 ## 14. Related documents
 
 - [`product-requirements.md`](product-requirements.md) — requirements and acceptance criteria.
-- [`roadmap.md`](roadmap.md) — delivery history and S14/S15 validation context.
+- [`roadmap.md`](roadmap.md) — delivery history and validation context.
 - [`architecture.md`](architecture.md) — runtime topology, caching and failure modes.
 - [`mathematical-model.md`](mathematical-model.md) — model definitions, calibration gate and limitations.
 - [`user-guide.md`](user-guide.md) — dashboard interpretation and troubleshooting.
 - [`README.md`](../README.md) — public overview and quick start.
+- [`CONTRIBUTING.md`](../CONTRIBUTING.md) — development workflow and contribution guidelines.
+- [`SECURITY.md`](../SECURITY.md) — security model, reporting and privacy expectations.
+- [`CHANGELOG.md`](../CHANGELOG.md) — release history.
+- [`LICENSE`](../LICENSE) — MIT license.
